@@ -1,0 +1,1958 @@
+<title>Code-Aware Auditor Credential</title>
+<style>
+  :root{
+    --ink-900:#16211f; --ink-700:#3d4b47; --ink-500:#647169;
+    --paper-0:#f2f5f3; --paper-1:#ffffff; --paper-2:#e7ebe8;
+    --rule:#d6dcd8; --rule-strong:#b9c2bc;
+    --accent:#0e6b64; --accent-ink:#ffffff; --accent-soft:#dcecea; --accent-soft-ink:#0a4f4a;
+    --risk-low:#2f7d52; --risk-low-soft:#dbefe1;
+    --risk-med:#a8720b; --risk-med-soft:#f3e6cc;
+    --risk-high:#b3402f; --risk-high-soft:#f5ddd7;
+    --risk-critical:#7c1f2e; --risk-critical-soft:#f0d7db;
+    --shadow: 0 1px 2px rgba(22,33,31,.06), 0 6px 20px -8px rgba(22,33,31,.18);
+    --focus: #1a8f85;
+    --font-display: Iowan Old Style, "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+    --font-body: "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+    --font-mono: SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+    /* code panel — intentionally theme-independent (reads as an editor, not a page surface) */
+    --code-bg:#0f1c19; --code-ink:#d6e8e3; --code-rule:#24413b; --code-dim:#7fa89d;
+    --code-mark:#5bc9bb; --code-string:#e0b25c; --code-key:#8fd0c4;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ink-900:#e9efec; --ink-700:#b7c3bd; --ink-500:#8a9791;
+      --paper-0:#101815; --paper-1:#17211d; --paper-2:#1e2a25;
+      --rule:#2a3630; --rule-strong:#3a4941;
+      --accent:#45b6ab; --accent-ink:#08221f; --accent-soft:#1b3330; --accent-soft-ink:#8fd9d0;
+      --risk-low:#5cc38c; --risk-low-soft:#173629;
+      --risk-med:#e0ab4c; --risk-med-soft:#3a2f16;
+      --risk-high:#e58370; --risk-high-soft:#3c211c;
+      --risk-critical:#f0879a; --risk-critical-soft:#3d1820;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px -10px rgba(0,0,0,.5);
+      --focus: #6cd0c5;
+    }
+  }
+  :root[data-theme="dark"]{
+    --ink-900:#e9efec; --ink-700:#b7c3bd; --ink-500:#8a9791;
+    --paper-0:#101815; --paper-1:#17211d; --paper-2:#1e2a25;
+    --rule:#2a3630; --rule-strong:#3a4941;
+    --accent:#45b6ab; --accent-ink:#08221f; --accent-soft:#1b3330; --accent-soft-ink:#8fd9d0;
+    --risk-low:#5cc38c; --risk-low-soft:#173629;
+    --risk-med:#e0ab4c; --risk-med-soft:#3a2f16;
+    --risk-high:#e58370; --risk-high-soft:#3c211c;
+    --risk-critical:#f0879a; --risk-critical-soft:#3d1820;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px -10px rgba(0,0,0,.5);
+    --focus: #6cd0c5;
+  }
+
+  *{box-sizing:border-box;}
+  body{ margin:0; background:var(--paper-0); color:var(--ink-900); font-family:var(--font-body); line-height:1.55; -webkit-font-smoothing:antialiased; }
+  ::selection{ background:var(--accent-soft); color:var(--accent-soft-ink); }
+  a{ color:var(--accent); }
+  button{ font-family:inherit; }
+  :focus-visible{ outline:2.5px solid var(--focus); outline-offset:2px; border-radius:3px; }
+  @media (prefers-reduced-motion: reduce){ *{ animation-duration:.001ms !important; transition-duration:.001ms !important; } }
+
+  .app{ display:grid; grid-template-columns: 288px minmax(0,1fr); min-height:100vh; }
+  .side{ border-right:1px solid var(--rule); background:var(--paper-1); padding:22px 16px 28px; position:sticky; top:0; height:100vh; overflow-y:auto; }
+  .brand{ display:flex; align-items:baseline; gap:9px; padding:2px 10px 16px; border-bottom:1px solid var(--rule); margin-bottom:14px; }
+  .brand .mark{ font-family:var(--font-mono); font-size:11px; letter-spacing:.06em; background:var(--accent); color:var(--accent-ink); padding:3px 6px; border-radius:3px; font-weight:700; }
+  .brand .name{ font-family:var(--font-display); font-size:16px; font-weight:600; letter-spacing:.01em; }
+
+  .progress-wrap{ padding:0 10px 18px; }
+  .progress-label{ display:flex; justify-content:space-between; font-size:11.5px; color:var(--ink-500); font-family:var(--font-mono); letter-spacing:.02em; margin-bottom:6px; font-variant-numeric: tabular-nums; }
+  .progress-track{ height:6px; border-radius:4px; background:var(--paper-2); overflow:hidden; }
+  .progress-fill{ height:100%; background:var(--accent); border-radius:4px; transition:width .35s ease; }
+
+  .navgroup{ margin-bottom:16px; }
+  .navgroup-title{ font-family:var(--font-mono); font-size:10.5px; letter-spacing:.11em; text-transform:uppercase; color:var(--ink-500); padding:0 10px; margin:0 0 6px; }
+  .navlist{ list-style:none; margin:0; padding:0; }
+  .navitem{ margin:1px 0; }
+  .navbtn{ width:100%; display:flex; align-items:center; gap:10px; background:none; border:1px solid transparent; border-radius:7px; padding:7px 10px; text-align:left; cursor:pointer; color:var(--ink-700); font-size:13px; }
+  .navbtn:hover{ background:var(--paper-2); }
+  .navbtn.active{ background:var(--accent-soft); color:var(--accent-soft-ink); font-weight:600; }
+  .navbtn .num{ font-family:var(--font-mono); font-size:10.5px; width:18px; flex:0 0 18px; text-align:right; color:var(--ink-500); font-variant-numeric:tabular-nums; }
+  .navbtn.active .num{ color:var(--accent-soft-ink); }
+  .navbtn .dot{ width:6px; height:6px; border-radius:50%; flex:0 0 6px; background:var(--rule-strong); }
+  .navbtn.done .dot{ background:var(--risk-low); }
+  .navbtn .label{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+  .main{ min-width:0; padding:40px clamp(20px,4vw,64px) 90px; }
+  .topline{ display:flex; justify-content:space-between; align-items:baseline; gap:16px; font-family:var(--font-mono); font-size:11px; color:var(--ink-500); letter-spacing:.05em; padding-bottom:14px; margin-bottom:26px; border-bottom:1px solid var(--rule); }
+  .content{ max-width:800px; }
+  .eyebrow{ font-family:var(--font-mono); font-size:11.5px; letter-spacing:.09em; text-transform:uppercase; color:var(--accent); margin:0 0 8px; }
+  h1.module-title{ font-family:var(--font-display); font-weight:600; font-size:clamp(26px,3vw,34px); margin:0 0 18px; text-wrap:balance; letter-spacing:.002em; }
+
+  .section-label{ font-family:var(--font-mono); font-size:11px; letter-spacing:.09em; text-transform:uppercase; color:var(--accent); margin:30px 0 10px; display:flex; align-items:center; gap:9px; }
+  .section-label::after{ content:""; flex:1; height:1px; background:var(--rule); }
+  .section-label:first-of-type{ margin-top:0; }
+
+  .objective{ display:flex; gap:12px; align-items:flex-start; background:var(--paper-1); border:1px solid var(--rule); border-left:3px solid var(--accent); border-radius:8px; padding:14px 16px; margin:0 0 8px; box-shadow:var(--shadow); }
+  .objective .k{ font-family:var(--font-mono); font-size:10.5px; letter-spacing:.08em; color:var(--accent); text-transform:uppercase; flex:0 0 auto; padding-top:2px;}
+  .objective ul{ margin:0; padding-left:18px; color:var(--ink-700); font-size:14px; }
+  .objective li{ margin-bottom:4px; }
+  .objective li:last-child{ margin-bottom:0; }
+
+  .prose{ font-size:15.5px; color:var(--ink-700); }
+  .prose p{ margin:0 0 15px; max-width:70ch; }
+  .prose strong{ color:var(--ink-900); }
+  .prose h4{ font-family:var(--font-display); font-size:16.5px; color:var(--ink-900); margin:18px 0 8px; font-weight:600; }
+  .prose ul, .prose ol{ margin:0 0 15px; padding-left:22px; max-width:66ch; }
+  .prose li{ margin-bottom:6px; }
+
+  .case{ background:var(--paper-1); border:1px solid var(--rule); border-radius:9px; padding:16px 18px; margin:0 0 6px; box-shadow:var(--shadow); position:relative; }
+  .case-tab{ position:absolute; top:-10px; left:16px; background:var(--paper-2); border:1px solid var(--rule); border-radius:5px; padding:2px 8px; font-family:var(--font-mono); font-size:10px; letter-spacing:.07em; text-transform:uppercase; color:var(--ink-500); }
+  .case p{ margin:6px 0 0; font-size:14.5px; color:var(--ink-700); }
+  .case p:first-of-type{ margin-top:4px; }
+
+  table.reftable{ border-collapse:collapse; width:100%; font-size:13.5px; margin:6px 0 4px; }
+  table.reftable th, table.reftable td{ border:1px solid var(--rule); padding:8px 10px; text-align:left; vertical-align:top; }
+  table.reftable th{ background:var(--paper-2); font-family:var(--font-mono); font-size:11px; letter-spacing:.04em; text-transform:uppercase; color:var(--ink-500); font-weight:600;}
+  table.reftable td.mono{ font-family:var(--font-mono); font-size:12.5px; white-space:nowrap; }
+  .table-wrap{ overflow-x:auto; border-radius:8px; }
+  code, .code{ font-family:var(--font-mono); font-size:.92em; background:var(--paper-2); padding:1px 5px; border-radius:4px; }
+
+  /* ---------- code panel ---------- */
+  .codebox{ background:var(--code-bg); border:1px solid var(--code-rule); border-radius:10px; overflow:hidden; margin-bottom:6px; }
+  .codebox .cb-head{ display:flex; align-items:center; justify-content:space-between; padding:8px 14px; border-bottom:1px solid var(--code-rule); }
+  .codebox .cb-file{ font-family:var(--font-mono); font-size:11.5px; color:var(--code-dim); }
+  .codebox .cb-lang{ font-family:var(--font-mono); font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--code-mark); background:rgba(91,201,187,.12); padding:2px 7px; border-radius:4px; }
+  .codebox pre{ margin:0; padding:15px 16px; overflow-x:auto; }
+  .codebox code{ background:none; padding:0; font-family:var(--font-mono); font-size:12.6px; line-height:1.65; color:var(--code-ink); white-space:pre; }
+  .codebox .mk{ color:var(--code-mark); font-weight:700; background:rgba(91,201,187,.16); border-radius:3px; padding:0 3px; }
+
+  .legend-table{ border-collapse:collapse; width:100%; font-size:13px; margin-bottom:6px; }
+  .legend-table th, .legend-table td{ border:1px solid var(--rule); padding:9px 11px; vertical-align:top; text-align:left; }
+  .legend-table th{ background:var(--paper-2); font-family:var(--font-mono); font-size:10.5px; letter-spacing:.04em; text-transform:uppercase; color:var(--ink-500); }
+  .legend-table td.mk-cell{ font-family:var(--font-mono); font-weight:700; color:var(--accent); text-align:center; width:38px; }
+  .legend-table td.eng{ color:var(--ink-700); }
+  .legend-table td.aud{ color:var(--ink-900); }
+
+  .lens-box{ border:1px solid var(--rule); border-left:3px solid var(--accent); border-radius:9px; padding:14px 18px; margin-bottom:6px; background:var(--paper-1); }
+  .lens-box ul{ margin:0; padding-left:18px; }
+  .lens-box li{ font-size:13.8px; color:var(--ink-700); margin-bottom:7px; }
+  .lens-box li:last-child{ margin-bottom:0; }
+  .lens-box li b{ color:var(--accent); }
+
+  .tabs-row{ display:flex; gap:8px; margin-bottom:10px; }
+  .tabbtn{ font-size:12.8px; font-weight:600; padding:7px 14px; border-radius:20px; border:1px solid var(--rule-strong); background:var(--paper-1); color:var(--ink-700); cursor:pointer; }
+  .tabbtn.on.good{ background:var(--risk-low-soft); color:var(--risk-low); border-color:var(--risk-low); }
+  .tabbtn.on.bad{ background:var(--risk-high-soft); color:var(--risk-high); border-color:var(--risk-high); }
+  .artifact-note{ font-size:13.4px; padding:11px 14px; border-radius:8px; margin-top:8px; }
+  .artifact-note.good{ background:var(--risk-low-soft); color:var(--risk-low); }
+  .artifact-note.bad{ background:var(--risk-high-soft); color:var(--risk-high); }
+
+  .pitfalls-box{ border:1px solid var(--rule); border-left:3px solid var(--risk-high); border-radius:9px; padding:14px 18px; margin-bottom:6px; background:var(--paper-1); }
+  .pitfalls-box ul{ margin:0; padding-left:18px; }
+  .pitfalls-box li{ font-size:13.8px; color:var(--ink-700); margin-bottom:7px; }
+  .pitfalls-box li:last-child{ margin-bottom:0; }
+  .pitfalls-box li b{ color:var(--risk-high); }
+
+  .docguide-box{ border:1.5px dashed var(--rule-strong); border-radius:10px; padding:16px 18px; margin-bottom:6px; background:var(--paper-1); }
+  .docguide-box .lbl{ font-family:var(--font-mono); font-size:10.5px; letter-spacing:.07em; text-transform:uppercase; color:var(--accent); margin:0 0 8px; }
+  .docguide-box p{ font-size:13.8px; color:var(--ink-700); margin:0 0 8px; }
+  .docguide-box .sample{ background:var(--paper-0); border:1px solid var(--rule); border-radius:7px; padding:11px 13px; font-size:13px; color:var(--ink-900); font-style:italic; }
+
+  /* ---------- Interactive block (scenario/quiz/exam) ---------- */
+  .interactive{ margin-top:30px; border:1px solid var(--rule-strong); border-radius:12px; background:var(--paper-1); box-shadow:var(--shadow); overflow:hidden; }
+  .interactive-head{ display:flex; align-items:center; gap:10px; padding:13px 18px; border-bottom:1px solid var(--rule); background:var(--paper-2); }
+  .interactive-head .tag{ font-family:var(--font-mono); font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; background:var(--accent); color:var(--accent-ink); padding:3px 7px; border-radius:4px; }
+  .interactive-head .title{ font-weight:600; font-size:14px; }
+  .interactive-body{ padding:20px 20px 22px; }
+
+  .scenario-prompt{ font-size:15px; color:var(--ink-900); margin:0 0 16px; max-width:64ch; }
+  .choice{ display:block; width:100%; text-align:left; background:var(--paper-0); border:1px solid var(--rule); border-radius:9px; padding:12px 14px; margin-bottom:9px; cursor:pointer; color:var(--ink-900); font-size:14px; }
+  .choice:hover{ border-color:var(--accent); }
+  .choice .lbl{ font-family:var(--font-mono); color:var(--accent); margin-right:9px; font-weight:700; }
+  .choice[disabled]{ cursor:default; }
+  .choice.correct{ border-color:var(--risk-low); background:var(--risk-low-soft); }
+  .choice.wrong{ border-color:var(--risk-high); background:var(--risk-high-soft); }
+  .choice.picked-neutral{ border-color:var(--accent); background:var(--accent-soft); }
+
+  .outcome{ margin-top:14px; border-radius:9px; padding:14px 16px; border:1px solid var(--rule); background:var(--paper-0); animation:rise .25s ease; }
+  @keyframes rise{ from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:translateY(0);} }
+  .outcome.tier-low{ border-left:4px solid var(--risk-low); }
+  .outcome.tier-med{ border-left:4px solid var(--risk-med); }
+  .outcome.tier-high{ border-left:4px solid var(--risk-high); }
+  .outcome .head{ display:flex; gap:8px; align-items:center; margin-bottom:6px; }
+  .outcome .head .pill{ font-family:var(--font-mono); font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; padding:2px 7px; border-radius:20px; font-weight:700;}
+  .pill.low{ background:var(--risk-low-soft); color:var(--risk-low); }
+  .pill.med{ background:var(--risk-med-soft); color:var(--risk-med); }
+  .pill.high{ background:var(--risk-high-soft); color:var(--risk-high); }
+  .pill.critical{ background:var(--risk-critical-soft); color:var(--risk-critical); }
+  .outcome .head b{ font-size:13.5px; }
+  .outcome p{ margin:5px 0 0; font-size:13.8px; color:var(--ink-700); }
+  .outcome .practice{ margin-top:8px; padding-top:8px; border-top:1px dashed var(--rule); font-size:13.2px; }
+  .outcome .practice b{ color:var(--accent); }
+
+  .retry-btn, .primary-btn{ margin-top:16px; background:var(--accent); color:var(--accent-ink); border:none; border-radius:7px; padding:9px 16px; font-size:13.5px; font-weight:600; cursor:pointer; }
+  .retry-btn:hover, .primary-btn:hover{ filter:brightness(1.06); }
+  .ghost-btn{ margin-top:16px; background:none; color:var(--ink-700); border:1px solid var(--rule-strong); border-radius:7px; padding:8px 15px; font-size:13.5px; cursor:pointer; }
+
+  .qz{ margin-bottom:22px; padding-bottom:20px; border-bottom:1px solid var(--rule); }
+  .qz:last-child{ border-bottom:none; margin-bottom:0; padding-bottom:0; }
+  .qz .q{ font-size:14.5px; font-weight:600; margin:0 0 10px; }
+  .qz .qmeta{ font-family:var(--font-mono); font-size:10px; color:var(--ink-500); letter-spacing:.04em; margin-bottom:4px; }
+
+  .score-panel{ text-align:center; padding:8px 10px 4px; }
+  .score-ring{ width:120px; height:120px; margin:6px auto 14px; position:relative; }
+  .score-ring svg{ transform:rotate(-90deg); }
+  .score-ring .num{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; flex-direction:column; font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
+  .score-ring .num .n{ font-size:26px; font-weight:700; }
+  .score-ring .num .d{ font-size:10px; color:var(--ink-500); }
+  .band{ display:inline-block; font-family:var(--font-mono); font-size:11.5px; letter-spacing:.06em; text-transform:uppercase; padding:4px 12px; border-radius:20px; font-weight:700; margin-bottom:6px; }
+  .band.readiness-low{ background:var(--risk-high-soft); color:var(--risk-high); }
+  .band.readiness-mid{ background:var(--risk-med-soft); color:var(--risk-med); }
+  .band.readiness-high{ background:var(--risk-low-soft); color:var(--risk-low); }
+  .score-note{ font-size:13px; color:var(--ink-700); max-width:44ch; margin:6px auto 0; }
+
+  .checklist{ list-style:none; margin:0; padding:0; }
+  .checklist li{ display:flex; gap:11px; align-items:flex-start; padding:9px 0; border-bottom:1px solid var(--rule); }
+  .checklist li:last-child{ border-bottom:none; }
+  .checklist input[type=checkbox]{ margin-top:3px; width:16px; height:16px; accent-color:var(--accent); flex:0 0 auto; }
+  .checklist .txt{ font-size:14px; }
+  .checklist .txt small{ display:block; color:var(--ink-500); font-size:12px; margin-top:2px; }
+
+  .rubric-row{ display:grid; grid-template-columns:96px 1fr; gap:14px; padding:13px 0; border-bottom:1px solid var(--rule); align-items:start; }
+  .rubric-row:last-child{ border-bottom:none; }
+  .rubric-tag{ font-family:var(--font-mono); font-size:10.5px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; padding:5px 0; text-align:center; border-radius:6px; height:fit-content; }
+  .rubric-tag.strong{ background:var(--risk-low-soft); color:var(--risk-low); }
+  .rubric-tag.medium{ background:var(--risk-med-soft); color:var(--risk-med); }
+  .rubric-tag.weak{ background:var(--risk-high-soft); color:var(--risk-high); }
+  .rubric-row p{ margin:0; font-size:13.6px; color:var(--ink-700); }
+
+  .doc-template{ border:1px solid var(--rule); border-radius:9px; background:var(--paper-0); padding:18px 20px; font-family:var(--font-mono); font-size:12.3px; line-height:1.75; color:var(--ink-700); white-space:pre-wrap; }
+  .doc-template .ph{ color:var(--accent); }
+  .doc-template .sec{ color:var(--ink-900); font-weight:700; }
+
+  .footer-nav{ display:flex; justify-content:space-between; margin-top:44px; padding-top:20px; border-top:1px solid var(--rule); gap:12px; }
+  .navbtn2{ display:flex; align-items:center; gap:8px; background:var(--paper-1); border:1px solid var(--rule-strong); border-radius:8px; padding:10px 15px; cursor:pointer; font-size:13.5px; color:var(--ink-900); font-weight:600; max-width:48%; }
+  .navbtn2 span.t{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .navbtn2:hover{ border-color:var(--accent); }
+  .navbtn2 .arrow{ font-family:var(--font-mono); color:var(--accent); flex:0 0 auto; }
+  .navbtn2[disabled]{ opacity:.35; cursor:default; }
+
+  @media (max-width: 860px){
+    .app{ grid-template-columns:1fr; }
+    .side{ position:relative; height:auto; border-right:none; border-bottom:1px solid var(--rule); }
+    .main{ padding:28px 18px 70px; }
+  }
+</style>
+
+<div class="app">
+  <nav class="side" id="side"></nav>
+  <main class="main">
+    <div class="topline">
+      <span id="topline-left">CODE-AWARE AUDITOR</span>
+      <span id="topline-right">MODULE — / —</span>
+    </div>
+    <div class="content" id="content"></div>
+  </main>
+</div>
+
+<script>
+(function(){
+
+/* ============================= SCENARIOS (audit judgment calls, one per module) ============================= */
+
+const SCENARIOS = {
+
+m1_codeReviewEnough: {
+  prompt: "The engineering manager tells you: 'We already reviewed the code for this control in the pull request — you don't need to look at the pipeline or the deployment logs too.' How do you respond?",
+  choices: [
+    { label:"A", text:"Accept it — a code review is a code review, and re-checking the pipeline would be redundant.",
+      tier:"high", pill:"Elevated Risk",
+      outcome:"A reviewed pull request proves the intended control was written correctly — it proves nothing about whether that exact code actually deployed, unmodified, to production. The chain breaks anywhere between commit and running system.",
+      practice:"Code-aware auditing means tracing Control → Code → Pipeline → Log, not stopping at the first link. A PR review is necessary evidence, never sufficient evidence on its own." },
+    { label:"B", text:"Explain that the PR review covers only one link in the chain, and request the pipeline run and deployment log tied to that same commit.",
+      tier:"low", pill:"Best Practice",
+      outcome:"This is the core discipline of the whole credential: the PR shows intent, the pipeline shows enforcement, the log shows execution. All three, correlated to the same commit, are what make the control provable.",
+      practice:"Ask for traceable evidence at each link, not just the one that's easiest to produce." },
+    { label:"C", text:"Insist on re-reading every line of source code yourself, independent of the PR review that already happened.",
+      tier:"med", pill:"Overcorrection",
+      outcome:"Re-deriving the engineering review from scratch isn't the auditor's job and won't scale — the credential's whole premise is interpreting and validating evidence, not re-performing engineering work.",
+      practice:"Trust the PR review as evidence of the code-review control; your job is validating the chain around it, not re-reviewing code line by line." }
+  ]
+},
+
+m2_wildcardIam: {
+  prompt: "An IAM policy JSON you're reviewing includes: <span class=\"code\">\"Action\": \"*\", \"Resource\": \"*\"</span> attached to a role used by a build service. The engineer says it's 'just for a legacy pipeline, low usage.'",
+  choices: [
+    { label:"A", text:"Note it informally in your working notes but don't raise it as a finding, since usage is described as low.",
+      tier:"high", pill:"Elevated Risk",
+      outcome:"A wildcard action and resource on any role is a full-privilege grant regardless of how often it's actually invoked — usage frequency doesn't reduce what the credential is capable of doing if compromised.",
+      practice:"Score the finding on the access the policy grants, not on a self-reported usage estimate. 'Low usage' is not a compensating control." },
+    { label:"B", text:"Document it as a finding, rate its severity based on what the role could do if compromised, and confirm whether any compensating control (e.g., scoped network access, short-lived credentials) offsets it.",
+      tier:"low", pill:"Best Practice",
+      outcome:"This is the correct read: identify what the structure grants, understand the blast radius if misused, and check for compensating controls before finalizing severity — not before raising it at all.",
+      practice:"A wildcard IAM policy is always worth a finding; the investigation is what determines its severity, not whether it gets raised." },
+    { label:"C", text:"Immediately escalate it as a Critical finding requiring emergency remediation before the audit can continue.",
+      tier:"med", pill:"Overcorrection",
+      outcome:"Escalating before checking for compensating controls or actual blast radius can overstate the risk and burn credibility if the role turns out to be tightly network-isolated or short-lived.",
+      practice:"Investigate before escalating. A wildcard policy deserves a finding almost always — the severity level still depends on context you haven't gathered yet." }
+  ]
+},
+
+m3_scanBypassed: {
+  prompt: "A CI/CD pipeline YAML includes a security-scan step, but it's configured with <span class=\"code\">continue-on-error: true</span> — meaning the pipeline proceeds to deployment even if the scan fails.",
+  choices: [
+    { label:"A", text:"Treat it as a functioning control, since the scan step does technically run on every deployment.",
+      tier:"high", pill:"Elevated Risk",
+      outcome:"A scan that runs but can never block a deployment isn't a control — it's a report. 'Runs' and 'enforces' are different claims, and this pipeline only supports the first one.",
+      practice:"A preventive control has to be able to prevent something. Check whether a failed check actually blocks the pipeline, not just whether the check executes." },
+    { label:"B", text:"Flag it as a detective-only (not preventive) control, note that failures don't block deployment, and check whether any other stage catches what this one misses.",
+      tier:"low", pill:"Best Practice",
+      outcome:"This correctly reclassifies the control's real strength — it can tell you something went wrong, but it cannot stop it — and checks whether that gap is covered anywhere else in the pipeline.",
+      practice:"Read pipeline YAML for what each step is actually configured to do on failure, not just whether the step exists in the file." },
+    { label:"C", text:"Assume it's a one-off misconfiguration and skip documenting it, planning to mention it informally later if it comes up.",
+      tier:"med", pill:"Overcorrection",
+      outcome:"An undocumented informal mention isn't audit evidence — if this doesn't make it into the workpapers, the finding effectively didn't happen, no matter how clearly you understood it in the moment.",
+      practice:"Document every material configuration finding formally, even ones that feel minor or likely to be quickly fixed." }
+  ]
+},
+
+m4_selfApprovedPR: {
+  prompt: "Reviewing pull request history, you find a merged PR where the same GitHub account both submitted the change and approved it — branch protection didn't block it because 'require review from someone other than the author' wasn't enabled.",
+  choices: [
+    { label:"A", text:"Skip it since a review technically did happen — the box was checked.",
+      tier:"high", pill:"Elevated Risk",
+      outcome:"A review by the same person who wrote the change provides no independent check at all — it satisfies the letter of 'a review occurred' while defeating the entire purpose of segregation of duties.",
+      practice:"Check who approved, not just whether an approval exists. Self-approval is a segregation-of-duties failure regardless of how the tool logs it." },
+    { label:"B", text:"Flag it as a segregation-of-duties control gap, quantify how many merges in the sample period show the same pattern, and recommend enabling the branch-protection rule that blocks self-approval.",
+      tier:"low", pill:"Best Practice",
+      outcome:"This turns a single instance into a measured finding — how often does this actually happen — and ties it to a specific, verifiable fix (a branch-protection setting), which is exactly what a remediation-ready finding looks like.",
+      practice:"When Git evidence reveals a control gap, check the platform setting that would have prevented it — GitHub branch protection rules are themselves auditable configuration." },
+    { label:"C", text:"Conclude the entire pull-request-review control is broken program-wide based on this one instance.",
+      tier:"med", pill:"Overcorrection",
+      outcome:"One instance shows the control has a gap, not that it's universally ineffective — the actual population of merges needs to be sampled (Module 8) before drawing a program-wide conclusion.",
+      practice:"Use one finding to trigger a sample of the broader population, not to declare a conclusion about the whole control's effectiveness." }
+  ]
+},
+
+m5_publicReadTemp: {
+  prompt: "A Terraform HCL file provisioning an S3 bucket sets <span class=\"code\">acl = \"public-read\"</span>, with a code comment reading <span class=\"code\"># temporary for testing, remove before prod</span>. The resource is defined in the production environment's directory.",
+  choices: [
+    { label:"A", text:"Accept the comment as sufficient explanation and move on, since it clearly states the intent to remove it later.",
+      tier:"high", pill:"Elevated Risk",
+      outcome:"A code comment is a note to another engineer, not a control — it has no enforcement mechanism and nothing stops this exact configuration from running indefinitely in production regardless of what it says.",
+      practice:"Infrastructure as code is audited for what it actually declares, not for what its comments promise. If it's in the production directory and unconditional, treat it as the real production configuration." },
+    { label:"B", text:"Flag it as a finding regardless of the comment, and check the actual deployed environment (not just the code) to see whether this setting is currently live.",
+      tier:"low", pill:"Best Practice",
+      outcome:"This correctly separates declared intent (a comment) from enforced reality (what Terraform actually applies) — and checking the live environment closes the loop on whether this is a live exposure right now.",
+      practice:"HCL comments are context, never evidence of a control. Validate the actual resource state, not the developer's stated intent." },
+    { label:"C", text:"Immediately demand the resource be deleted before continuing any further audit work.",
+      tier:"med", pill:"Overcorrection",
+      outcome:"Directing remediation mid-audit oversteps the auditor's role and skips understanding the actual current exposure and business context first — the auditor's job is to report the finding, not personally halt engineering work.",
+      practice:"Document and escalate through the normal findings process; remediation decisions and timelines belong to the control owner, not the auditor." }
+  ]
+},
+
+m6_breakGlassSkip: {
+  prompt: "An OPA policy-as-code rule is supposed to block any Terraform plan that creates an unencrypted storage resource. The pipeline log shows this exact policy check being skipped for one specific deployment, tagged with a 'break-glass override' flag.",
+  choices: [
+    { label:"A", text:"Treat the policy as effective, since it's present in the codebase and enforced on every other deployment.",
+      tier:"high", pill:"Elevated Risk",
+      outcome:"A policy-as-code control that can be bypassed with a flag is only as strong as the governance around who can set that flag and why — an unreviewed override is a live control failure, not an edge case to ignore.",
+      practice:"An automated control's real strength includes its override path. Always ask: who can bypass this, under what conditions, and is that logged and reviewed?" },
+    { label:"B", text:"Investigate the break-glass event specifically — who triggered it, whether it was approved, and whether the resulting resource was later brought back into compliance.",
+      tier:"low", pill:"Best Practice",
+      outcome:"This treats the override as its own control point worth auditing in full — approval, justification, and remediation — rather than either ignoring it or assuming the worst without evidence.",
+      practice:"Every break-glass or override mechanism needs its own trail: who, why, when, and what happened to the resource afterward." },
+    { label:"C", text:"Recommend removing the break-glass override capability from the pipeline entirely, with no further investigation.",
+      tier:"med", pill:"Overcorrection",
+      outcome:"Break-glass paths exist for genuine emergencies; recommending their removal outright — without evaluating whether this specific use was governed and justified — would likely get overridden by the business anyway.",
+      practice:"The finding is usually about governance of the override (approval, logging, follow-up), not the mere existence of an emergency path." }
+  ]
+},
+
+m7_rootAccountUsed: {
+  prompt: "A CloudTrail log entry shows the AWS root account (not an IAM user or role) was used to modify an IAM policy — something the organization's own standard says should never happen outside a declared emergency.",
+  choices: [
+    { label:"A", text:"Note it as a minor observation, since the change itself looks reasonable and nothing broke.",
+      tier:"high", pill:"Elevated Risk",
+      outcome:"Root account usage is a control-bypass signal independent of what the specific change was — root has no MFA-scoped, role-based, or logged-approval boundary the way IAM roles do, so its use is itself the finding.",
+      practice:"Root account activity is evaluated on the fact of its use, not on whether the specific action looked benign in hindsight." },
+    { label:"B", text:"Flag it as a Critical finding, request justification for why root was used instead of a scoped IAM role, and confirm whether root access is now disabled or tightly restricted going forward.",
+      tier:"low", pill:"Best Practice",
+      outcome:"This is the correct severity and the correct question — root usage should be rare enough that every instance has a specific, documented reason, and the finding should drive toward eliminating routine root access entirely.",
+      practice:"Any root account activity in cloud logs deserves Critical-tier attention and a direct question: why wasn't a scoped role used instead?" },
+    { label:"C", text:"Assume it was a one-time emergency action and close it without documentation, since root access is sometimes unavoidable.",
+      tier:"med", pill:"Overcorrection",
+      outcome:"Closing it without documentation loses the ability to show a pattern (or its absence) later, and skips confirming whether this was actually a declared, approved emergency use versus routine convenience.",
+      practice:"Document every root-account event, even ones that turn out to be justified — the record itself is what proves the control (or its absence) over time." }
+  ]
+},
+
+m8_last25Sample: {
+  prompt: "A pipeline has run roughly 10,000 deployments this year. Someone suggests: 'Just look at the last 25 in the log — that's plenty for a sample.'",
+  choices: [
+    { label:"A", text:"Accept the last-25 approach since it's fast and the pipeline hasn't changed recently.",
+      tier:"high", pill:"Elevated Risk",
+      outcome:"The most recent 25 runs are a convenience sample, not a representative one — they cluster in a narrow recent time window and would miss any control failure that happened earlier in the audit period, which is exactly what testing is supposed to catch.",
+      practice:"A sample has to represent the full population and period under review, not just whatever is easiest to pull up right now." },
+    { label:"B", text:"Design a sample that spans the full audit period, using a method appropriate to a system-generated population (e.g., stratified or randomized selection across the full date range) rather than just the most recent entries.",
+      tier:"low", pill:"Best Practice",
+      outcome:"This is what sampling in an automated environment should look like — the population is huge and system-generated, so the selection method needs to deliberately cover the full period, not lean on whatever's most convenient to retrieve.",
+      practice:"For system-generated populations, sampling methodology (coverage across the full period, appropriate size for the population) matters more than sample count alone." },
+    { label:"C", text:"Insist on reviewing all 10,000 deployment records individually before drawing any conclusion.",
+      tier:"med", pill:"Overcorrection",
+      outcome:"Full-population review of a system-generated dataset this size isn't proportional or necessary — a well-designed sample is both sufficient and standard audit practice; 100% review wastes effort without materially improving assurance.",
+      practice:"Sampling exists precisely so you don't have to review entire system-generated populations. A properly designed sample is sufficient evidence." }
+  ]
+},
+
+m9_screenshotEvidence: {
+  prompt: "A control owner provides a screenshot of a compliance dashboard showing 'MFA Enforcement: 100%' as evidence that a control operated all year.",
+  choices: [
+    { label:"A", text:"Accept the screenshot — it clearly shows the number the control requires.",
+      tier:"high", pill:"Elevated Risk",
+      outcome:"A screenshot is a single, unverifiable point-in-time claim with no underlying data behind it — it can't be traced to a source system, can't be resampled, and proves nothing about the other 364 days of the audit period.",
+      practice:"Screenshots sit at the weak end of the evidence-reliability scale (Module 9). They're acceptable as illustration, never as the primary proof for a period-long control." },
+    { label:"B", text:"Request the underlying raw data behind the dashboard — the identity provider's export or API log showing MFA status across the full audit period — and treat the screenshot as supplementary context only.",
+      tier:"low", pill:"Best Practice",
+      outcome:"This is exactly the evidence hierarchy the credential is built around: logs and system exports are strong evidence because they're traceable and resamplable; a dashboard screenshot is, at best, a pointer to where stronger evidence should come from.",
+      practice:"Always ask 'what system generated the number behind this screenshot, and can I get the raw export?' before accepting a dashboard image as evidence." },
+    { label:"C", text:"Reject the screenshot outright and refuse to consider it as any part of the evidence package.",
+      tier:"med", pill:"Overcorrection",
+      outcome:"A screenshot isn't worthless — it's useful corroborating context — it's just insufficient as the primary evidence. Refusing to consider it at all discards a legitimate (if weak) data point unnecessarily.",
+      practice:"Weak evidence still has a place as corroboration; the discipline is knowing it can't carry the conclusion by itself." }
+  ]
+},
+
+m10_mfaDrift: {
+  prompt: "Terraform code declares that MFA is required for all IAM users in a specific group. A live check of the actual AWS IAM console shows one user in that group without MFA enabled.",
+  choices: [
+    { label:"A", text:"Conclude the control is effective, since the Terraform code — the source of truth — clearly requires MFA.",
+      tier:"high", pill:"Elevated Risk",
+      outcome:"Terraform code describes intended state; it doesn't guarantee actual state. This is precisely what configuration drift is — a gap between what the code says and what's actually running — and it's invisible if you only read the code.",
+      practice:"Never conclude a control is effective from IaC alone. Validate the declared configuration against the live environment before drawing a conclusion." },
+    { label:"B", text:"Document the drift as a finding, determine how the user was able to end up without MFA despite the Terraform requirement, and check whether this is an isolated case or a broader pattern.",
+      tier:"low", pill:"Best Practice",
+      outcome:"This treats the mismatch as the finding itself worth investigating — was this user created outside Terraform, was the policy applied after the fact, is drift-detection tooling even running — rather than either dismissing it or over-reacting to one instance.",
+      practice:"When IaC and live environment disagree, the disagreement itself is the audit finding — investigate its root cause and scope before concluding severity." },
+    { label:"C", text:"Assume the Terraform code must be outdated and quietly correct your own notes to match the live environment without raising it as a finding.",
+      tier:"med", pill:"Overcorrection",
+      outcome:"Silently reconciling the discrepancy in your own notes erases the actual finding — that IaC and live state disagree — which is itself evidence the drift-detection or apply process isn't working reliably.",
+      practice:"Never resolve a code-vs-reality mismatch by just picking one and moving on. The mismatch is the finding." }
+  ]
+},
+
+m11_missingCorrelationId: {
+  prompt: "You're trying to build a traceability chain from a specific IAM policy change (found in a CloudTrail log) back to the commit and pipeline run that made it — but there's no correlation ID, commit hash, or pipeline run reference anywhere in the log entry.",
+  choices: [
+    { label:"A", text:"Assume the change came from the most recent pipeline run around that time and document the trace as complete.",
+      tier:"high", pill:"Elevated Risk",
+      outcome:"An assumed link based on timing proximity isn't traceability — it's a guess presented as evidence. If challenged, there's no way to actually prove this log entry came from that specific commit.",
+      practice:"Traceability requires an explicit, verifiable link (a correlation ID, commit SHA embedded in the deployment, or a pipeline run ID tagged on the resource) — timing alone is not sufficient linkage." },
+    { label:"B", text:"Document the traceability gap itself as a finding — the control may be operating, but its effectiveness can't currently be proven end-to-end — and recommend adding correlation IDs to the deployment pipeline's logging.",
+      tier:"low", pill:"Best Practice",
+      outcome:"This correctly separates 'the control might be working' from 'the control's effectiveness can be proven' — and the recommended fix (correlation IDs threaded through the pipeline) is exactly what would close the gap going forward.",
+      practice:"An unprovable traceability chain is itself a finding, independent of whether the underlying control seems to be working." },
+    { label:"C", text:"Conclude the control has definitely failed, since you can't trace it.",
+      tier:"med", pill:"Overcorrection",
+      outcome:"Inability to trace isn't the same as proof of failure — it's proof of an evidence gap. Concluding outright failure overstates what the missing correlation ID actually tells you.",
+      practice:"An untraceable chain means 'unproven,' not 'failed.' Report it as a traceability gap, not as a confirmed control failure." }
+  ]
+},
+
+m12_jargonFinding: {
+  prompt: "A draft finding reads: 'S3 bucket ACL misconfigured to public-read; IAM role policy contains wildcard resource grant.' It's headed for the audit committee, most of whom are not engineers.",
+  choices: [
+    { label:"A", text:"Send it as written — the audit committee should be able to look up unfamiliar terms if needed.",
+      tier:"high", pill:"Elevated Risk",
+      outcome:"A finding the audience can't interpret doesn't drive a decision — the committee can't weigh business risk or approve remediation priority for a sentence they don't understand, no matter how technically precise it is.",
+      practice:"A finding that doesn't translate into business risk hasn't finished being written yet — technical accuracy and audience-readiness are both required, not a trade-off." },
+    { label:"B", text:"Rewrite it with the technical detail retained but translated: what data or system is actually exposed, what could realistically happen, and how urgent the fix is — with the technical detail available in a linked workpaper for those who want it.",
+      tier:"low", pill:"Best Practice",
+      outcome:"This keeps the precision (so an engineer can act on it) while making the business risk legible to the people who have to decide what to do about it — exactly the 'translating code into audit language' skill this credential is built around.",
+      practice:"Write findings in two layers: a business-risk headline for decision-makers, technical detail in the workpaper for whoever remediates it." },
+    { label:"C", text:"Strip out all technical detail entirely and describe it only in vague business terms like 'a security gap was found.'",
+      tier:"med", pill:"Overcorrection",
+      outcome:"Removing the technical detail entirely makes the finding unactionable for the engineer who has to fix it, and unverifiable for the next auditor who has to follow up — precision shouldn't be sacrificed for readability, both are needed.",
+      practice:"Business-readable doesn't mean technically vague. Keep the precise detail; just don't lead with it." }
+  ]
+}
+
+};
+
+/* ============================= CORE MODULES (12) ============================= */
+
+const MODULES = [
+
+/* ---------- 1 ---------- */
+{
+  id:1, num:"01", title:"Foundations of Code-Aware Auditing",
+  objectives:[
+    "Explain what makes an automated, code-defined environment different to audit than a traditional one.",
+    "Define a 'code-defined control' and give an example.",
+    "Name the Control → Code → Pipeline → Log traceability chain and why every link matters."
+  ],
+  scenario:{ tab:"Real-world audit scenario", body:"You're auditing a fintech's core banking platform that deploys roughly 40 times a day through automated pipelines. The prior audit used quarterly screenshots of an admin panel as its primary evidence. Your manager asks: 'we passed last year with that approach — why change it now?'" },
+  concepts:`
+    <p>Traditional IT audit evidence assumes a slow-moving environment: a control is configured, it stays that way for months, and a point-in-time screenshot reasonably represents the whole period. In a modern DevOps/cloud environment, configuration can change dozens of times a day, deployed entirely through automation — a screenshot from March tells you nothing reliable about April.</p>
+    <p>A <strong>code-defined control</strong> is any control expressed as machine-readable configuration that a system enforces automatically — an IAM policy JSON, a pipeline approval gate, a Terraform encryption setting, an OPA policy rule. Code-defined controls can be read directly, tested for logical soundness, and — critically — correlated against logs proving they actually executed.</p>
+    <h4>The traceability chain</h4>
+    <p>Every module in this program builds toward one discipline: <strong>Control → Code → Pipeline → Log</strong>. The control describes intent. The code implements it. The pipeline enforces it. The log proves it happened. A conclusion resting on only one link in that chain is incomplete, no matter how convincing that one link looks.</p>`,
+  interpret:{ fileName:".github/workflows/deploy.yml (excerpt)", lang:"YAML", code:
+`on:
+  push:
+    branches: [main]   ①
+
+jobs:
+  deploy:
+    if: github.actor != 'unknown'   ②
+    runs-on: ubuntu-latest`,
+    legend:[
+      { mark:"①", engineer:"Deploys trigger automatically whenever code lands on main.", auditor:"This IS the deployment-trigger control in code form — ask what actually gated the merge to main, not just what happens after." },
+      { mark:"②", engineer:"A basic guard against an unauthenticated actor.", auditor:"'Not unknown' is a weak identity check, not the same as 'is an authorized deployer.' Ask what actually restricts who can trigger this." }
+    ]
+  },
+  lens:[
+    "Confirm whether the control you're testing is defined in code (a policy, pipeline, or IaC file) or exists only in a document/process description.",
+    "Request the full traceability chain before accepting any single piece of evidence — Control → Code → Pipeline → Log.",
+    "Treat 'we passed last year' as irrelevant to this year's evidence — automated environments change control state continuously, not annually.",
+    "Distinguish what can be learned from an interview (engineer intent) from what must be independently verified (logs, configs) — don't let interviews substitute for evidence."
+  ],
+  artifacts:{
+    goodLabel:"Layered Evidence Request", badLabel:"Screenshot-Only Request",
+    goodFile:"evidence-request-good.txt", goodLang:"TEXT",
+    goodCode:`Evidence Requested — Access Provisioning Control (CTRL-014)
+
+1. Terraform module defining IAM role/group structure (HCL)
+2. Pipeline run log showing the approval step for 5 sampled requests
+3. Identity-provider export (JSON) confirming actual group membership
+   matches Terraform-declared membership for the same 5 samples
+
+All evidence tied to the same request IDs, spanning the full audit period.`,
+    goodNote:"Traceable, sampled across the full period, and cross-validated against three independent sources.",
+    badFile:"evidence-request-bad.txt", badLang:"TEXT",
+    badCode:`Evidence Requested — Access Provisioning Control (CTRL-014)
+
+Please send a screenshot of the access management dashboard
+showing current settings.`,
+    badNote:"A single point-in-time image with no traceability, no sampling, and no way to verify it reflects reality."
+  },
+  exercise:{ fileName:"deploy-job.yml", lang:"YAML", code:
+`jobs:
+  deploy:
+    environment: production
+    needs: [security-scan, manual-approval]`,
+    question:"Based on this pipeline job definition, what does 'needs: [security-scan, manual-approval]' tell an auditor?",
+    options:["Nothing auditable — it's just YAML syntax","The deploy job cannot run until both the security-scan job and a manual-approval gate have completed successfully — this is a preventive control enforced by the pipeline itself","It means a human manually deployed the code, with no automation involved","It's a comment with no functional effect"],
+    correct:1,
+    explain:"'needs' creates a hard dependency in most CI/CD systems — the deploy job is blocked from running until the listed jobs succeed. That makes this line itself the enforcement mechanism for both the scan and the approval gate: exactly the kind of control-in-code an auditor should be able to point to directly as evidence." },
+  scenarioKey:"m1_codeReviewEnough",
+  redFlags:[
+    "Treating a passed prior-year audit as evidence the current control environment is unchanged.",
+    "Accepting 'the engineers said it's fine' as a substitute for independently verifiable evidence.",
+    "Auditing only the code and never checking whether that code is what's actually running (see Module 10)."
+  ],
+  docGuidance:{ note:"When scoping the audit plan, name the specific traceability chain you intend to test for each control — not just the control's description.",
+    sample:"Workpaper CTRL-014-WP1: Tested the access-provisioning control by tracing 5 sampled requests from Terraform-declared group membership, through the associated pipeline approval-gate run, to the corresponding identity-provider export confirming actual membership. All 5 traced without exception." },
+  deliverables:[
+    ["Audit plan scoped around traceability chains, not just control descriptions","Each control names the Control→Code→Pipeline→Log evidence expected."],
+    ["List of code-defined vs. document-only controls for the environment","Sets expectations for how much of the audit can rely on system-generated evidence."],
+    ["Evidence-request template using the layered (code+pipeline+log) format","Replaces single-screenshot requests going forward."]
+  ]
+},
+
+/* ---------- 2 ---------- */
+{
+  id:2, num:"02", title:"Reading Structured Data (JSON, YAML, HCL)",
+  objectives:[
+    "Parse the structural shape of JSON, YAML, and HCL well enough to identify what a block declares.",
+    "Locate permission grants inside an IAM policy JSON without writing any code.",
+    "Spot common misconfiguration patterns — wildcards, missing conditions, insecure defaults — across all three formats."
+  ],
+  scenario:{ tab:"Real-world audit scenario", body:"You've been handed a 40-line IAM policy JSON file, a 200-line Terraform module, and a pipeline YAML file, with a note that says 'the config is the control — please review.' You've never written a line of JSON, YAML, or HCL in your life." },
+  concepts:`
+    <p>You don't need to write JSON, YAML, or HCL to audit them — you need to recognize their shape. <strong>JSON</strong> nests objects <code>{ }</code> and arrays <code>[ ]</code>; the auditable content is almost always inside a key like <code>"Effect"</code>, <code>"Action"</code>, or <code>"Resource"</code>. <strong>YAML</strong> uses indentation instead of brackets — a key indented under a parent belongs to it; misreading indentation is the single most common way auditors misread pipeline logic. <strong>HCL</strong> (Terraform) declares resources — <code>resource "type" "name" { }</code> — and the arguments inside the braces are the actual configuration applied to real infrastructure.</p>
+    <h4>What to hunt for regardless of language</h4>
+    <p>In every format, the job is the same: find where <strong>permission</strong> is granted, where a <strong>condition</strong> narrows or widens that grant, and where an <strong>unset default</strong> quietly applies broader access than anyone explicitly intended.</p>`,
+  interpret:{ fileName:"iam-policy.json", lang:"JSON", code:
+`{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",   ①
+      "Action": "s3:*",   ②
+      "Resource": "arn:aws:s3:::prod-customer-data/*"   ③
+    }
+  ]
+}`,
+    legend:[
+      { mark:"①", engineer:"Standard boilerplate — every statement needs an Effect.", auditor:"Confirm it says 'Allow', not 'Deny' — the two look structurally identical but mean opposite things." },
+      { mark:"②", engineer:"Grants all S3 actions — common shorthand during development.", auditor:"'s3:*' means read, write, AND delete. Ask whether this role genuinely needs delete access, or a narrower action list was intended." },
+      { mark:"③", engineer:"Scoped to one bucket, so it looks contained.", auditor:"The trailing '/*' means every object in the bucket. Resource scoping and action scoping are separate questions — check both." }
+    ]
+  },
+  lens:[
+    "Find every \"Effect\": \"Allow\" and read its paired Action and Resource together — never evaluate one without the other.",
+    "In YAML, verify indentation defines the nesting you think it does — paste ambiguous sections into a plain-text editor if unsure.",
+    "In HCL, check both the resource block's explicit arguments and the provider's documented default for that resource type — an omitted argument often means an insecure default applies silently.",
+    "Treat wildcards (*, 0.0.0.0/0, unscoped ARNs) as an automatic flag worth investigating, in any of the three formats."
+  ],
+  artifacts:{
+    goodLabel:"Scoped Policy", badLabel:"Overpermissive Policy",
+    goodFile:"iam-policy-scoped.json", goodLang:"JSON",
+    goodCode:`{
+  "Effect": "Allow",
+  "Action": ["s3:GetObject", "s3:PutObject"],
+  "Resource": "arn:aws:s3:::prod-customer-data/reports/*",
+  "Condition": {
+    "StringEquals": { "aws:PrincipalTag/Team": "billing" }
+  }
+}`,
+    goodNote:"Explicit action list, scoped resource path, and a condition narrowing the grant to a specific team's tagged principals.",
+    badFile:"iam-policy-open.json", badLang:"JSON",
+    badCode:`{
+  "Effect": "Allow",
+  "Action": "*",
+  "Resource": "*"
+}`,
+    badNote:"No action list, no resource scope, no condition — this is full administrative access to the entire account."
+  },
+  exercise:{ fileName:"pipeline-snippet.yml", lang:"YAML", code:
+`deploy:
+  needs: build
+  environment:
+    name: production
+  when: manual`,
+    question:"What does 'when: manual' most likely enforce in this pipeline stage?",
+    options:["Nothing — it's a comment","The deploy stage requires a person to manually trigger it rather than running automatically after 'build' succeeds","It means the deployment failed","It disables the production environment entirely"],
+    correct:1,
+    explain:"'when: manual' is a common CI/CD pattern for a human-gated deployment step — functionally a manual-approval control expressed directly in pipeline configuration, and its presence (or absence) is directly testable evidence." },
+  scenarioKey:"m2_wildcardIam",
+  redFlags:[
+    "Wildcards (*, 0.0.0.0/0, unscoped ARNs) anywhere in a permission or network-access block.",
+    "YAML steps that look conditional but the condition always evaluates true (e.g., checking a variable hardcoded elsewhere).",
+    "HCL resources with security-relevant arguments simply omitted, relying on a provider default the reader hasn't checked."
+  ],
+  docGuidance:{ note:"Quote the exact key path when documenting a structured-data finding, not just a paraphrase — it lets anyone re-locate the exact line later.",
+    sample:"Finding: IAM policy attached to role \"ci-deploy-role\" (iam-policy.json, Statement[0]) grants Action: \"s3:*\" with Resource: \"*\", providing unrestricted S3 access account-wide. No Condition block narrows this grant." },
+  deliverables:[
+    ["Annotated copy of each reviewed JSON/YAML/HCL file with findings marked","Exact key paths referenced, not paraphrased summaries."],
+    ["List of every wildcard or unscoped grant found across sampled files","Consolidated view for severity triage."],
+    ["Confirmation of indentation/nesting understanding for ambiguous YAML sections","Verified in a plain editor, not assumed from a quick read."]
+  ]
+},
+
+/* ---------- 3 ---------- */
+{
+  id:3, num:"03", title:"CI/CD Pipelines as Control Systems",
+  objectives:[
+    "Read pipeline configuration well enough to identify what stages exist and what actually gates them.",
+    "Distinguish a preventive pipeline control (blocks on failure) from a detective one (reports only).",
+    "Identify approval gates, security scans, and deployment restrictions directly from pipeline definitions."
+  ],
+  scenario:{ tab:"Real-world audit scenario", body:"A pipeline definition has 14 stages. The engineering team says 'security is baked into every deploy.' Your job is to confirm exactly what that means from the pipeline YAML itself — not from what you're told in a meeting." },
+  concepts:`
+    <p>A CI/CD pipeline is, functionally, a chain of controls expressed as configuration. Each stage either does something (build, scan, deploy) or gates something (an approval, a required check). The core auditor skill is reading the pipeline's <strong>dependency structure</strong> — which stages must succeed before the next one runs — because that dependency structure <em>is</em> the enforcement mechanism.</p>
+    <h4>Three control types show up constantly</h4>
+    <p><strong>Security scans</strong> (SAST, dependency scanning, container scanning) — check whether a failed scan actually blocks the pipeline, or only reports. <strong>Approval gates</strong> — a required human sign-off before a stage proceeds, typically tied to a specific environment. <strong>Deployment controls</strong> — restrictions on who or what can trigger a deploy stage, and to which environment.</p>`,
+  interpret:{ fileName:"deploy-pipeline.yml", lang:"YAML", code:
+`stages:
+  - build
+  - test
+  - security-scan
+  - approve-prod   ①
+  - deploy-prod
+
+approve-prod:
+  when: manual   ②
+  allow_failure: false   ③
+  only: [main]
+
+deploy-prod:
+  needs: [approve-prod]   ④`,
+    legend:[
+      { mark:"①", engineer:"Just another stage name in the list.", auditor:"This stage IS the approval gate — its presence in the dependency chain is the control, not a document describing an approval process." },
+      { mark:"②", engineer:"Pauses the pipeline for input.", auditor:"Confirm who is authorized to provide that manual trigger by checking the platform's permission settings for this environment, not just the YAML." },
+      { mark:"③", engineer:"Standard setting.", auditor:"This is what makes the gate real — 'false' means the pipeline cannot proceed without success. If this were 'true', the 'approval' would be cosmetic." },
+      { mark:"④", engineer:"Defines execution order.", auditor:"This is the actual enforcement — deploy-prod is structurally blocked until approve-prod succeeds. This line is your evidence the gate is enforced, not merely present." }
+    ]
+  },
+  lens:[
+    "For every control-relevant stage, check what depends on it — a stage nothing depends on is informational only, not enforced.",
+    "Check allow_failure / continue-on-error settings on every scan or check step — this determines preventive vs. detective.",
+    "Confirm which branch/environment restrictions apply — a gate scoped to one branch may not cover every path to production.",
+    "Cross-check the platform's access settings (who can approve a gate) — the YAML shows the gate exists; platform config shows who can pass through it."
+  ],
+  artifacts:{
+    goodLabel:"Enforced Gate", badLabel:"Cosmetic Gate",
+    goodFile:"gate-enforced.yml", goodLang:"YAML",
+    goodCode:`approve-prod:
+  when: manual
+  allow_failure: false
+
+deploy-prod:
+  needs: [approve-prod]`,
+    goodNote:"Deploy is structurally blocked without a successful, non-bypassable approval stage.",
+    badFile:"gate-cosmetic.yml", badLang:"YAML",
+    badCode:`approve-prod:
+  when: manual
+  allow_failure: true
+
+deploy-prod:
+  needs: []`,
+    badNote:"The approval stage can fail (or be skipped) without blocking anything — deploy-prod has no dependency on it at all."
+  },
+  exercise:{ fileName:"scan-stage.yml", lang:"YAML", code:
+`security-scan:
+  script: run-sast-scan.sh
+  allow_failure: true`,
+    question:"What does 'allow_failure: true' tell an auditor about this security-scan stage?",
+    options:["The scan is more thorough because failures are allowed","The pipeline can proceed to the next stage even if this scan finds critical issues and fails — making this a detective, not preventive, control","The scan step will never actually run","It has no effect on pipeline behavior"],
+    correct:1,
+    explain:"'allow_failure: true' tells the pipeline engine not to block on this stage's failure — however good the scan itself is, it cannot stop a vulnerable deployment. That reclassifies it from preventive to detective, which materially changes the severity of any related finding." },
+  scenarioKey:"m3_scanBypassed",
+  redFlags:[
+    "A scan or check stage with allow_failure/continue-on-error set true, informally described as 'a control.'",
+    "An approval gate with no corresponding 'needs' dependency from the deploy stage — present but unenforced.",
+    "Branch/environment restrictions scoped too narrowly, leaving an unrestricted path to production through a different branch."
+  ],
+  docGuidance:{ note:"State explicitly whether each pipeline control tested is preventive or detective in your workpaper — readers often assume preventive by default.",
+    sample:"Workpaper CTRL-021-WP1: security-scan stage in deploy-pipeline.yml configured with allow_failure: true — reclassified from preventive to detective control. deploy-prod proceeds regardless of scan outcome. Recommend allow_failure: false or an explicit compensating gate." },
+  deliverables:[
+    ["Pipeline dependency map for each control-relevant stage","Shows what actually blocks what, not the stage list alone."],
+    ["Preventive vs. detective classification for every scan/check stage","allow_failure/continue-on-error setting recorded for each."],
+    ["Cross-check of platform approval permissions against the YAML-declared gate","Confirms who can actually pass through each gate."]
+  ]
+},
+
+/* ---------- 4 ---------- */
+{
+  id:4, num:"04", title:"Git & GitHub for Auditors",
+  objectives:[
+    "Use commit history, pull requests, and approvals as primary audit evidence.",
+    "Evaluate segregation of duties directly from Git/GitHub data.",
+    "Trace a specific change from pull request through merge to deployment."
+  ],
+  scenario:{ tab:"Real-world audit scenario", body:"You're asked to test 'all production changes are peer reviewed' for the full audit period. There's no manual change log anywhere — the only record that exists is the Git/GitHub history itself." },
+  concepts:`
+    <p>Git history is strong evidence because it's tamper-evident and timestamped by design — a commit hash changes if its content changes, and history is, in a well-configured repo, effectively append-only. A pull request record shows who authored a change, who approved it, when, and what was actually merged — all in one traceable object.</p>
+    <h4>What "peer reviewed" actually means in Git terms</h4>
+    <p>Confirm three things independently: the PR has at least one approval from someone other than the author; branch protection <strong>enforces</strong> that requirement rather than it being optional convention; and the merged commit matches what was actually reviewed — no changes pushed after the last approval without a re-review.</p>`,
+  interpret:{ fileName:"PR #4821 (GitHub)", lang:"GIT", code:
+`Author: jsmith
+Commits: 3
+Reviewers requested: asingh
+Review: asingh approved (2026-03-14 09:12)   ①
+Merged by: jsmith (2026-03-14 09:15)   ②
+Branch protection: "Require approval" = enabled   ③
+Base branch: main`,
+    legend:[
+      { mark:"①", engineer:"Shows the review happened.", auditor:"Confirm the approval timestamp is before the final commit's timestamp — an approval on an earlier version doesn't cover later changes." },
+      { mark:"②", engineer:"Standard merge record.", auditor:"The author merged their own approved PR — fine if branch protection required someone else's approval first; not fine if self-approval were also possible." },
+      { mark:"③", engineer:"A repo setting.", auditor:"This is what makes the approval mandatory rather than optional — verify this setting directly in repo config, don't infer policy from one compliant-looking PR." }
+    ]
+  },
+  lens:[
+    "Confirm approver ≠ author on every sampled PR — the core segregation-of-duties test.",
+    "Check the approval timestamp against the final commit's timestamp, not just against PR creation.",
+    "Verify branch protection settings directly (required reviews, required status checks) rather than inferring policy from a sample of compliant PRs alone.",
+    "Trace at least one PR fully from commit through merge to the deployment log entry it produced."
+  ],
+  artifacts:{
+    goodLabel:"Compliant PR", badLabel:"Non-Compliant PR",
+    goodFile:"pr-compliant.txt", goodLang:"GIT",
+    goodCode:`Author: jsmith
+Approved by: asingh (different user)
+Approval timestamp: before final commit
+Branch protection: required reviews = 1, enforced on main`,
+    goodNote:"Independent approver, approval covers the final commit, and the requirement is enforced by settings, not convention.",
+    badFile:"pr-noncompliant.txt", badLang:"GIT",
+    badCode:`Author: jsmith
+Approved by: jsmith (self-approval; protection disabled)
+Merged: directly to main, no review required`,
+    badNote:"No independent review occurred, and branch protection wasn't configured to require one."
+  },
+  exercise:{ fileName:"pr-history.txt", lang:"GIT", code:
+`PR #512 — approved by rpatel at 10:02
+Additional commit pushed by author at 10:14 (post-approval)
+Merged at 10:15 — no re-review`,
+    question:"What does this PR history most likely indicate to an auditor?",
+    options:["Full compliance — an approval exists on record","A control gap: code was changed after approval with no re-review before merge, meaning the approved version and the merged version may differ","The approver made a mistake and should be retrained","Nothing auditable — this is normal Git behavior"],
+    correct:1,
+    explain:"An approval only covers the code it was given at the time of approval. A commit pushed after approval and merged without a fresh review breaks the link between 'what was reviewed' and 'what was deployed' — a common and important finding pattern in Git-based evidence." },
+  scenarioKey:"m4_selfApprovedPR",
+  redFlags:[
+    "Self-approval possible or observed (author and approver are the same account).",
+    "Commits pushed after the final approval with no re-review before merge.",
+    "Branch protection technically enabled but scoped to the wrong branch, or bypassable by repo admins with no logged exception trail."
+  ],
+  docGuidance:{ note:"Reference the specific PR number, commit SHA, and timestamp in every Git-based finding — this makes it independently verifiable by anyone with repo access.",
+    sample:"Finding: PR #512 (commit a1b2c3d) was approved by rpatel at 10:02, then modified by a further commit at 10:14 and merged at 10:15 without a subsequent re-review. Branch protection did not require re-review on new commits." },
+  deliverables:[
+    ["Sample of PRs tested for approver-independence and re-review-after-change","Sized per Module 8's sampling methodology."],
+    ["Branch protection configuration exported and reviewed directly","Not inferred solely from a compliant-looking PR sample."],
+    ["At least one full PR-to-deployment trace documented","Commit → pipeline run → deployment log, correlated by hash or run ID."]
+  ]
+},
+
+/* ---------- 5 ---------- */
+{
+  id:5, num:"05", title:"Infrastructure as Code (Terraform)",
+  objectives:[
+    "Read Terraform HCL well enough to identify resources, variables, and module structure.",
+    "Locate where security- and compliance-relevant controls live inside infrastructure code.",
+    "Distinguish declared configuration from actual deployed state."
+  ],
+  scenario:{ tab:"Real-world audit scenario", body:"A cloud environment has over 300 resources, all provisioned via Terraform. Your predecessor's approach was to log into the AWS console and screenshot settings one resource at a time. You have three days, not three weeks." },
+  concepts:`
+    <p>A Terraform <strong>resource block</strong> (<code>resource "aws_s3_bucket" "logs" { }</code>) declares one piece of infrastructure and its configuration — this is where most control-relevant settings live (encryption, public access, logging). <strong>Variables</strong> parameterize values so the same code deploys differently per environment — always check what value a variable actually resolves to in the environment you're auditing, not just its default. <strong>Modules</strong> package reusable resource groups — a control implemented once in a module applies everywhere the module is used, which is powerful for consistency and risky if the module itself has a flaw.</p>
+    <h4>Read state, not just configuration, when you can</h4>
+    <p>Terraform's state file (or a <code>plan</code>/<code>show</code> output) reflects what Terraform believes is actually deployed — closer to ground truth than the source files alone, though still not a substitute for checking the live cloud environment directly (Module 10).</p>`,
+  interpret:{ fileName:"s3.tf", lang:"HCL", code:
+`resource "aws_s3_bucket" "customer_data" {   ①
+  bucket = "prod-customer-data"
+}
+
+resource "aws_s3_bucket_public_access_block" "customer_data" {   ②
+  bucket              = aws_s3_bucket.customer_data.id
+  block_public_acls   = true
+  block_public_policy = true
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "customer_data" {   ③
+  bucket = aws_s3_bucket.customer_data.id
+  rule {
+    apply_server_side_encryption_by_default { sse_algorithm = "aws:kms" }
+  }
+}`,
+    legend:[
+      { mark:"①", engineer:"Declares the bucket itself.", auditor:"The base resource block alone says nothing about security — the controls live in the separate resource blocks below. Always look for the paired configuration resources, not just the bucket declaration." },
+      { mark:"②", engineer:"Standard hardening block.", auditor:"Confirm this resource actually exists for every bucket in scope — its absence, not a 'false' setting, is the more common finding." },
+      { mark:"③", engineer:"Sets encryption at rest.", auditor:"Check the algorithm specifically — a bucket relying only on the provider default (or no block at all) may have weaker or no encryption." }
+    ]
+  },
+  lens:[
+    "For every sensitive resource (storage, database, compute with data access), confirm the paired security-configuration resources exist — don't assume they're bundled automatically.",
+    "Check what value each relevant variable actually resolves to for the audited environment (via tfvars or pipeline variable injection), not just its declared default.",
+    "If a module is used, confirm you've reviewed the module's actual resource definitions, not just the calling code that references it.",
+    "Where possible, compare declared configuration against terraform plan/state output, and ultimately the live cloud console, to catch drift (Module 10)."
+  ],
+  artifacts:{
+    goodLabel:"Hardened Bucket", badLabel:"Exposed Bucket",
+    goodFile:"s3-hardened.tf", goodLang:"HCL",
+    goodCode:`resource "aws_s3_bucket_public_access_block" "logs" {
+  bucket                  = aws_s3_bucket.logs.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}`,
+    goodNote:"All four public-access-block settings explicitly enabled — no reliance on provider defaults.",
+    badFile:"s3-exposed.tf", badLang:"HCL",
+    badCode:`resource "aws_s3_bucket" "logs" {
+  bucket = "prod-logs"
+  acl    = "public-read"
+}`,
+    badNote:"No public-access-block resource at all, and the bucket's own ACL is explicitly set to public-read."
+  },
+  exercise:{ fileName:"rds.tf", lang:"HCL", code:
+`resource "aws_db_instance" "primary" {
+  engine               = "postgres"
+  publicly_accessible  = true
+  skip_final_snapshot  = true
+}`,
+    question:"What is the most significant control concern in this Terraform block?",
+    options:["skip_final_snapshot could complicate disaster recovery, but is the secondary issue","publicly_accessible = true exposes the database instance to the public internet directly — the primary finding","The engine choice of postgres is itself a security risk","There is no concern; this is standard configuration"],
+    correct:1,
+    explain:"'publicly_accessible = true' on a database instance is a direct network-exposure finding — the database can be reached from outside the private network by design, rarely appropriate for a production data store. skip_final_snapshot is worth noting but is a continuity concern, not an exposure one." },
+  scenarioKey:"m5_publicReadTemp",
+  redFlags:[
+    "A sensitive resource (storage, database) with no paired security-configuration resource block at all.",
+    "publicly_accessible, public-read ACLs, or 0.0.0.0/0 security group rules on production resources.",
+    "Variables whose resolved value for the actual environment wasn't checked — auditing only the declared default."
+  ],
+  docGuidance:{ note:"Cite the exact resource address (type.name) in every Terraform-based finding, matching Terraform's own addressing so it can be located instantly.",
+    sample:"Finding: aws_db_instance.primary (rds.tf) is configured with publicly_accessible = true, exposing the production database instance to direct connection attempts from the public internet. No corresponding network ACL or security group restriction was found to compensate." },
+  deliverables:[
+    ["Inventory of sensitive resources reviewed with security-configuration resource presence noted","Storage, database, and compute resources in scope."],
+    ["Resolved variable values confirmed for the audited environment","Not just declared defaults from the .tf source."],
+    ["Comparison of .tf declared config vs. terraform plan/state output for sampled resources","First checkpoint toward full drift validation in Module 10."]
+  ]
+},
+
+/* ---------- 6 ---------- */
+{
+  id:6, num:"06", title:"Policy-as-Code & Control Automation",
+  objectives:[
+    "Understand how OPA/Sentinel-style policy-as-code enforces controls automatically at the pipeline stage.",
+    "Map an automated policy rule to the compliance framework requirement it satisfies.",
+    "Evaluate whether a policy-as-code control can actually block non-compliant changes, not just flag them."
+  ],
+  scenario:{ tab:"Real-world audit scenario", body:"The engineering team says 'we don't need manual control testing for encryption anymore — it's enforced by policy-as-code.' You've never seen an OPA rule before in your life." },
+  concepts:`
+    <p>Policy-as-code expresses a control as a rule evaluated automatically against every relevant change — most commonly via <strong>Open Policy Agent (OPA)</strong> using its Rego language, or HashiCorp <strong>Sentinel</strong> for Terraform-specific enforcement. Structurally, these rules almost always follow the same shape: a condition describing a non-compliant state, and a <code>deny</code> (or equivalent) result that blocks the pipeline when that condition is true.</p>
+    <h4>Read for what the rule actually blocks, not what it's named</h4>
+    <p>A policy file named <code>encryption-required.rego</code> only enforces what its actual <code>deny</code> condition checks — a narrowly written condition (e.g., checking only one resource type) may leave other resource types completely uncovered despite the file's name suggesting broad coverage.</p>`,
+  interpret:{ fileName:"encryption-required.rego", lang:"REGO", code:
+`package terraform.s3
+
+deny[msg] {   ①
+  input.resource_type == "aws_s3_bucket"   ②
+  not input.config.server_side_encryption_configuration   ③
+  msg := "S3 buckets must have encryption enabled"
+}`,
+    legend:[
+      { mark:"①", engineer:"Defines a rule that produces a denial message.", auditor:"This IS the control's enforcement mechanism — confirm the pipeline is actually configured to fail on any 'deny' result, not just log it (see Module 3)." },
+      { mark:"②", engineer:"Scopes the rule to one resource type.", auditor:"This rule only covers aws_s3_bucket — ask explicitly whether equivalent rules exist for other resource types or other clouds, or if this is the only one." },
+      { mark:"③", engineer:"Checks for a missing encryption block.", auditor:"This only checks that a configuration block exists, not that it uses a specific strong algorithm — a weak or default encryption setting could still pass this rule." }
+    ]
+  },
+  lens:[
+    "Identify exactly what condition the policy checks by reading the deny/violation block itself, not just the policy's filename or stated purpose.",
+    "Confirm the pipeline stage running this policy actually blocks on a match (Module 3's allow_failure lesson applies directly here).",
+    "Map each policy rule to the specific framework requirement(s) it's meant to satisfy, and flag any framework requirement with no corresponding rule.",
+    "Check for override/exception (break-glass) paths and whether they're logged and governed."
+  ],
+  artifacts:{
+    goodLabel:"Enforced & Broad", badLabel:"Logged-Only & Narrow",
+    goodFile:"policy-strong.rego", goodLang:"REGO",
+    goodCode:`package terraform.storage
+
+deny[msg] {
+  input.resource_type in ["aws_s3_bucket", "azurerm_storage_account"]
+  not input.config.encryption
+  msg := "Storage must be encrypted"
+}
+# pipeline.yml — policy-check stage: allow_failure: false`,
+    goodNote:"Covers multiple resource types across clouds, and the pipeline is configured to actually block on violation.",
+    badFile:"policy-weak.rego", badLang:"REGO",
+    badCode:`package terraform.storage
+
+warn[msg] {
+  input.resource_type == "aws_s3_bucket"
+  not input.config.encryption
+  msg := "Consider enabling encryption"
+}`,
+    badNote:"Uses 'warn' (non-blocking) instead of 'deny', and only covers one resource type on one cloud provider."
+  },
+  exercise:{ fileName:"approval-policy.rego", lang:"REGO", code:
+`deny[msg] {
+  input.change_type == "production_deploy"
+  count(input.approvals) < 1
+  msg := "Production deploys require at least one approval"
+}`,
+    question:"Based on this rule, what would happen to a production deploy with zero approvals?",
+    options:["It would be logged but allowed to proceed","It would be blocked by this policy, assuming the pipeline enforces 'deny' results","It only applies to non-production changes","It requires one specific named approver"],
+    correct:1,
+    explain:"'deny' rules are the blocking category in OPA-style policy-as-code — a matching condition (here, fewer than 1 approval on a production deploy) produces a denial that a properly configured pipeline will not proceed past. The rule checks a count threshold, not a specific named approver." },
+  scenarioKey:"m6_breakGlassSkip",
+  redFlags:[
+    "Rules using a non-blocking category (warn/advise) for what's described elsewhere as a mandatory control.",
+    "Narrow resource-type or cloud-provider coverage relative to what the policy's name or stated purpose implies.",
+    "No visibility into override/exception usage — a break-glass path with no logging of who used it or why."
+  ],
+  docGuidance:{ note:"Quote the exact deny/violation condition when documenting a policy-as-code control, and separately confirm and cite the pipeline setting that enforces it.",
+    sample:"Finding: encryption-required.rego (package terraform.s3) denies aws_s3_bucket resources lacking a server_side_encryption_configuration block. Confirmed the policy-check pipeline stage is configured with allow_failure: false, making this an effective preventive control for S3 specifically. No equivalent rule found for Azure or GCP storage resources in the same repository." },
+  deliverables:[
+    ["Inventory of policy-as-code rules with resource/framework coverage mapped","Identifies gaps as well as what's covered."],
+    ["Confirmation each policy's enforcing pipeline stage actually blocks (not just logs) on violation","Cross-referenced against Module 3's technique."],
+    ["Override/exception log reviewed for the audit period","Who used any break-glass path, and whether it was approved."]
+  ]
+},
+
+/* ---------- 7 ---------- */
+{
+  id:7, num:"07", title:"Cloud-Native Audit Logs",
+  objectives:[
+    "Read AWS CloudTrail / Azure Activity Log event structure — who, what, when, from where.",
+    "Validate control execution through logs rather than assuming it from configuration alone.",
+    "Detect anomalies (unusual actor, unusual time, unusual source) in a log sample."
+  ],
+  scenario:{ tab:"Real-world audit scenario", body:"A control states 'only the deployment pipeline can modify production IAM roles.' The engineering team is confident this is true. You have 90 days of CloudTrail logs and need to actually prove it, not just accept the claim." },
+  concepts:`
+    <p>Cloud-native logs (AWS CloudTrail, Azure Activity Log, GCP Audit Logs) record who did what, when, from where, and how — every API call against the cloud environment, structured as JSON events. Anchor on four fields: <strong>identity</strong> (who/what made the call), <strong>event name</strong> (the specific action taken), <strong>source IP</strong> (where the call came from), and <strong>timestamp</strong>.</p>
+    <h4>Logs prove execution; configuration only proves intent</h4>
+    <p>A pipeline YAML or IAM policy tells you what's supposed to happen. A log entry tells you what actually did happen. Validating a control means finding the log evidence that it executed as designed — not assuming execution because the configuration (Modules 2–6) looked right.</p>`,
+  interpret:{ fileName:"cloudtrail-event.json", lang:"JSON", code:
+`{
+  "eventTime": "2026-03-14T09:15:22Z",
+  "eventName": "PutRolePolicy",   ①
+  "userIdentity": {
+    "type": "AssumedRole",
+    "arn": "arn:aws:sts::...:assumed-role/ci-deploy-role"   ②
+  },
+  "sourceIPAddress": "34.201.XX.XX",   ③
+  "requestParameters": { "roleName": "prod-app-role" }
+}`,
+    legend:[
+      { mark:"①", engineer:"Identifies which API call this event records.", auditor:"A privileged, control-relevant action (modifying an IAM role's permissions) — confirm this event name is on your list of actions worth alerting on or sampling." },
+      { mark:"②", engineer:"Shows which role made the call.", auditor:"Confirm this matches the expected identity for this action — 'ci-deploy-role' making this call is expected; an individual human user's role making it would be a finding." },
+      { mark:"③", engineer:"Records the network origin of the call.", auditor:"Cross-check this IP against known pipeline infrastructure ranges — a call from an unexpected source is a strong anomaly signal even when the identity looks correct." }
+    ]
+  },
+  lens:[
+    "Anchor on identity + event name + source together — any one field alone is easy to misread as normal.",
+    "Compare the identity making a privileged call against who/what is expected to make it — a human making a call expected only from automation is a red flag by itself.",
+    "Check timestamps against expected patterns (deployment windows, business hours) — activity at unusual times deserves a closer look.",
+    "Use log data to test a control's claim directly, rather than accepting the claim because the configuration looked correct."
+  ],
+  artifacts:{
+    goodLabel:"Expected Actor", badLabel:"Unexpected Actor",
+    goodFile:"log-expected.json", goodLang:"JSON",
+    goodCode:`{
+  "eventName": "PutRolePolicy",
+  "userIdentity": { "type": "AssumedRole", "arn": ".../ci-deploy-role" },
+  "sourceIPAddress": "<pipeline runner IP range>"
+}`,
+    goodNote:"The automated pipeline role made the change, from the pipeline's known network range — matches expected control design.",
+    badFile:"log-unexpected.json", badLang:"JSON",
+    badCode:`{
+  "eventName": "PutRolePolicy",
+  "userIdentity": { "type": "IAMUser", "arn": ".../jsmith" },
+  "sourceIPAddress": "203.0.113.44"
+}`,
+    badNote:"A named individual user made a privileged IAM change directly, from an unrecognized IP — bypasses the pipeline entirely."
+  },
+  exercise:{ fileName:"cloudtrail-sample.json", lang:"JSON", code:
+`{
+  "eventName": "ConsoleLogin",
+  "userIdentity": { "type": "Root" },
+  "sourceIPAddress": "198.51.100.7",
+  "additionalEventData": { "MFAUsed": "No" }
+}`,
+    question:"What combination of fields makes this log entry most significant to an auditor?",
+    options:["ConsoleLogin events are always low-risk and can be skipped","Root-account login with MFA not used is a maximum-severity combination regardless of other context","The specific IP address is the only field that matters here","This event type isn't captured by CloudTrail"],
+    correct:1,
+    explain:"Root account usage without MFA combines two high-severity signals at once — root has no scoped permissions boundary, and no MFA means a compromised password alone would be sufficient. Treat this combination as Critical severity by default, pending investigation." },
+  scenarioKey:"m7_rootAccountUsed",
+  redFlags:[
+    "Privileged actions performed by an identity type not expected for that action (a human user where only automation should act).",
+    "Root account activity of any kind, especially without MFA.",
+    "Source IPs outside known/expected ranges for automated actors, or login activity at implausible hours with no business justification on file."
+  ],
+  docGuidance:{ note:"Quote the specific eventName, identity ARN, and timestamp for any log-based finding — this makes it independently re-queryable by anyone with log access.",
+    sample:"Finding: CloudTrail event at 2026-03-14T09:15:22Z (eventName: PutRolePolicy) shows IAM user jsmith directly modifying role prod-app-role from source IP 203.0.113.44, bypassing the expected ci-deploy-role automation path. No corresponding pipeline run correlates to this change." },
+  deliverables:[
+    ["Log sample validating each control's claimed identity/actor for privileged actions","Per Module 8's sampling methodology."],
+    ["List of any root-account or non-MFA privileged activity in the audit period","Reviewed individually regardless of sample size."],
+    ["Source IP / identity anomaly review documented","Cross-referenced against expected automation ranges."]
+  ]
+},
+
+/* ---------- 8 ---------- */
+{
+  id:8, num:"08", title:"Sampling in Automated Environments",
+  objectives:[
+    "Distinguish traditional (small, manual population) sampling from continuous/automated-environment sampling.",
+    "Design a sampling approach appropriate to a large, system-generated population.",
+    "Select samples that cover the full audit period, not just recent activity."
+  ],
+  scenario:{ tab:"Real-world audit scenario", body:"A control has executed automatically roughly 10,000 times this year — once per deployment. Traditional training says 'pick 25 samples.' Is 25 still right, and more importantly, which 25?" },
+  concepts:`
+    <p>Traditional sampling assumes a population generated and reviewed manually, where a modest, statistically-justified sample size (often 25–40 items) reasonably represents the whole. Automated environments frequently produce much larger, entirely system-generated populations — this doesn't necessarily mean a larger sample is required, but it does mean <strong>how</strong> you select it matters more than in a manual environment.</p>
+    <h4>Coverage across the period beats convenience</h4>
+    <p>A sample pulled entirely from the most recent week misses everything earlier in the audit period — including exactly the kind of control failure a full-period review exists to catch. Stratify by time (a fixed number of samples per month) or randomize across the full date range, rather than defaulting to "the most recent N."</p>
+    <h4>Continuous sampling as a complement, not a replacement</h4>
+    <p>Where continuous control monitoring is in place, it can supplement — but rarely fully replace — a designed sample, because the auditor also needs to independently validate the monitoring itself is working.</p>`,
+  interpret:{ fileName:"sampling-worksheet.txt", lang:"TEXT", code:
+`Control: CTRL-021 — Production deploys require passing security scan
+Population: 8,412 pipeline runs (full audit period, Jan-Dec)   ①
+Method: Stratified — 3 samples randomly selected per month   ②
+Sample size: 36   ③
+Coverage check: All 12 months represented, no month over-weighted`,
+    legend:[
+      { mark:"①", engineer:"Just a count of pipeline runs.", auditor:"This defines your population — confirm it's the FULL population for the FULL audit period, not just what's easy to query from a recent dashboard view." },
+      { mark:"②", engineer:"A selection method.", auditor:"Stratification by month guarantees period-wide coverage — ask how the 3-per-month samples were actually chosen (random vs. convenient) within each month." },
+      { mark:"③", engineer:"The resulting count.", auditor:"36 is reasonable for this population, but the number matters less than the method that produced it — a badly selected 36 is worse than a well-selected 20." }
+    ]
+  },
+  lens:[
+    "Confirm the stated population is complete for the full audit period before sampling from it — a partial population produces an unreliable sample regardless of method.",
+    "Favor stratified or randomized selection across the full date range over 'most recent N' convenience sampling.",
+    "Document the selection method itself in the workpaper, not just the resulting sample — the method is what makes the sample defensible.",
+    "For very large or continuously monitored populations, evaluate whether automated monitoring can appropriately supplement (not replace) a designed sample."
+  ],
+  artifacts:{
+    goodLabel:"Period-Wide Sample", badLabel:"Convenience Sample",
+    goodFile:"sample-good.txt", goodLang:"TEXT",
+    goodCode:`Population: 8,412 runs, full year
+Method: Stratified random, 3 per month
+Sample: 36 runs across all 12 months`,
+    goodNote:"Every month represented; selection method documented and repeatable.",
+    badFile:"sample-bad.txt", badLang:"TEXT",
+    badCode:`Population: 8,412 runs, full year
+Method: "Most recent 25 in the dashboard"
+Sample: 25 runs, all from the last 2 weeks`,
+    badNote:"Covers roughly 0.2% of the audit period and would miss any failure outside the last two weeks entirely."
+  },
+  exercise:{ fileName:"sample-plan.txt", lang:"TEXT", code:
+`Control: CTRL-014 - Access requests require manager approval
+Population: 1,204 access requests (system-generated, full year)
+Proposed method: "Ask the access-management team to send us
+20 examples they think demonstrate the control working."`,
+    question:"What is the primary problem with this proposed sampling method?",
+    options:["20 is too small a sample size for this population","The control owner is selecting their own evidence, defeating the independence sampling is meant to provide — the auditor must select from the full population instead","1,204 is too large a population to sample from at all","There is no problem; this is efficient and acceptable"],
+    correct:1,
+    explain:"Letting the control owner choose which examples to show you removes independence entirely — they will naturally, even unintentionally, select the cases that look best. The auditor must select the sample from the full, independently obtained population, not receive a curated set from the party being tested." },
+  scenarioKey:"m8_last25Sample",
+  redFlags:[
+    "Sample selection performed or curated by the control owner rather than the auditor.",
+    "'Most recent N' used as the default sampling method for a full-period population.",
+    "No documentation of population size or selection method — only the resulting sample list."
+  ],
+  docGuidance:{ note:"Document population size, full date range covered, selection method, and resulting sample size together — a sample list alone is not defensible without its method.",
+    sample:"Sampling Worksheet CTRL-021-SW1: Population = 8,412 pipeline runs (Jan 1-Dec 31). Method = stratified random, 3 runs selected per calendar month by the audit team independently. Sample size = 36. All 12 months represented." },
+  deliverables:[
+    ["Sampling worksheet for each tested control, method documented","Population, method, and sample size — not just the sample."],
+    ["Confirmation samples were auditor-selected, not control-owner-curated","For every sample used in the audit."],
+    ["Period-wide coverage check for each sample","No month/quarter left unrepresented without documented justification."]
+  ]
+},
+
+/* ---------- 9 ---------- */
+{
+  id:9, num:"09", title:"Engineered Evidence Validation",
+  objectives:[
+    "Rank evidence types by reliability: logs > exports > screenshots.",
+    "Determine whether a piece of evidence is independently traceable and resamplable.",
+    "Identify when system-generated but curated ('engineered') evidence still needs independent validation."
+  ],
+  scenario:{ tab:"Real-world audit scenario", body:"A control owner provides a beautifully formatted PDF titled 'Annual Compliance Summary,' generated by an internal dashboard tool, stating every control passed. Is that the evidence, or is that a claim that still needs its own evidence?" },
+  concepts:`
+    <p>Not all evidence is equally trustworthy, even when it's system-generated. The reliability hierarchy: <strong>logs</strong> (raw, timestamped, generated automatically by the system performing the action — strongest, closest to the actual event, hardest to alter after the fact) > <strong>exports</strong> (a structured pull from a system, e.g., an identity provider's user list — strong, but one step removed from the raw event) > <strong>screenshots</strong> (weakest — unverifiable point-in-time images with no underlying data, easy to stage or crop, impossible to resample).</p>
+    <h4>"Engineered" evidence still needs a source</h4>
+    <p>A polished dashboard report is engineered evidence — built by a system, but curated (which metrics, over what period, with what framing) by whoever configured the dashboard. Treat it like any secondary source: useful for corroboration, but trace its headline claims back to primary logs or exports before relying on it.</p>`,
+  interpret:{ fileName:"evidence-reliability-scale.txt", lang:"TEXT", code:
+`STRONG - Raw logs (CloudTrail, pipeline execution logs, Git history)   ①
+MEDIUM - System exports (identity provider export, ticketing report)   ②
+WEAK    - Screenshots, verbal assurance, informal chat messages   ③`,
+    legend:[
+      { mark:"①", engineer:"The most technical, least 'readable' evidence type.", auditor:"Strong precisely because it's raw and system-generated at the moment of the event — hardest to alter, always traceable and resamplable." },
+      { mark:"②", engineer:"A cleaner, more digestible format.", auditor:"One step removed from the raw event — confirm how the export was generated and whether it can be reproduced/reverified, not just accepted as-is." },
+      { mark:"③", engineer:"The easiest evidence to produce quickly.", auditor:"No traceability, no resampling possible — acceptable only as corroboration alongside stronger evidence, never as primary proof." }
+    ]
+  },
+  lens:[
+    "For every piece of evidence received, ask: can I trace this back to its source system, and could I independently pull it again myself?",
+    "Treat dashboards, PDF summaries, and curated reports as secondary sources — trace their headline claims back to primary logs/exports.",
+    "Weight evidence reliability into your conclusion explicitly — a finding resting only on weak evidence should be labeled as such.",
+    "Ask who configured the reporting/export tool and whether that party has an incentive to present the metric favorably."
+  ],
+  artifacts:{
+    goodLabel:"Strong Evidence Package", badLabel:"Weak Evidence Package",
+    goodFile:"evidence-strong.txt", goodLang:"TEXT",
+    goodCode:`1. Raw CloudTrail export, full audit period, unfiltered
+2. Identity provider user/group export, timestamped, API-pulled
+3. Dashboard summary - included ONLY as a cross-check`,
+    goodNote:"Primary evidence is raw and traceable; the dashboard is corroboration, not the proof.",
+    badFile:"evidence-weak.txt", badLang:"TEXT",
+    badCode:`1. Screenshot of dashboard: "MFA Enforcement: 100%"
+2. Verbal confirmation from control owner`,
+    badNote:"No primary evidence at all — both items are unverifiable and unresamplable."
+  },
+  exercise:{ fileName:"evidence-submission.txt", lang:"TEXT", code:
+`Control: CTRL-007 - Quarterly access reviews performed
+Evidence submitted: One screenshot per quarter of an email
+saying "Access review complete" sent by the reviewing manager.`,
+    question:"How should this evidence package be rated on the reliability scale, and why?",
+    options:["Strong — it's dated and comes from a manager","Medium — emails are a common business record","Weak — a screenshot of an email claiming completion has no underlying data showing what was actually reviewed or what the outcome was","This can't be evaluated without more context on the manager's role"],
+    correct:2,
+    explain:"The email confirms an assertion was made, not that a review actually occurred or what it found. There's no underlying access list, no record of what was checked, and no way to verify the claim — this is weak evidence regardless of who sent it or how official it looks." },
+  scenarioKey:"m9_screenshotEvidence",
+  redFlags:[
+    "A conclusion resting entirely on screenshots or verbal assurance with no underlying system data.",
+    "Evidence that cannot be independently resampled or reproduced by the auditor.",
+    "A dashboard/report accepted at face value with no trace-back to the primary system generating its underlying numbers."
+  ],
+  docGuidance:{ note:"State the evidence reliability tier (Strong/Medium/Weak) explicitly for each piece of evidence cited in a finding or conclusion — don't let the reader assume.",
+    sample:"Workpaper CTRL-007-WP1: Evidence submitted for quarterly access reviews consisted solely of screenshots of confirmation emails (Weak tier — no underlying review data). Requested and did not receive the actual access list reviewed each quarter. Conclusion: control effectiveness could not be validated with Medium or Strong tier evidence." },
+  deliverables:[
+    ["Evidence reliability tier assigned to every artifact used in the audit","Strong/Medium/Weak, documented per item."],
+    ["Trace-back performed for any dashboard/report evidence to its primary source","Or documented as unavailable if trace-back wasn't possible."],
+    ["List of any conclusions resting on Weak-tier evidence only","Flagged distinctly for follow-up or scope limitation language."]
+  ]
+},
+
+/* ---------- 10 ---------- */
+{
+  id:10, num:"10", title:"Drift Detection & Continuous Compliance",
+  objectives:[
+    "Define configuration drift and why it's specific to automated/IaC-managed environments.",
+    "Compare IaC-declared configuration against actual live environment state.",
+    "Validate that remediation of a drift finding actually closed the gap, not just addressed one instance."
+  ],
+  scenario:{ tab:"Real-world audit scenario", body:"Terraform code for a security group has been unchanged for six months and looks correct. A live check of the actual AWS console shows a rule that isn't in the code at all. How did that happen, and does it matter?" },
+  concepts:`
+    <p><strong>Configuration drift</strong> is any mismatch between what infrastructure-as-code declares and what's actually running — caused by manual out-of-band changes, a partially failed apply, or a resource modified by another process entirely. Drift is specific to automated environments precisely because IaC creates an assumption — "the code is the source of truth" — that manual changes silently violate.</p>
+    <h4>Detecting it</h4>
+    <p>The direct method: run a plan/diff comparison against the live environment — any proposed change it reports is drift, because the tool is describing what it would need to do to reconcile reality back to the declared code. Where direct access isn't available, compare a live-environment export (Module 7-style) against the declared configuration (Module 5-style) manually for sampled resources.</p>
+    <h4>Validating remediation, not just the fix</h4>
+    <p>When drift is remediated, confirm the fix addressed the root cause (e.g., restricting who can make manual console changes) and not just the one instance — otherwise the same drift reappears on the next out-of-band change.</p>`,
+  interpret:{ fileName:"drift-report.txt", lang:"TEXT", code:
+`Resource: aws_security_group.app_sg
+Declared (Terraform): 1 ingress rule - port 443 from 10.0.0.0/8   ①
+Actual (live AWS): 2 ingress rules - port 443 from 10.0.0.0/8,
+                    PLUS port 22 from 0.0.0.0/0   ②
+Last Terraform apply: 6 months ago
+Drift source: Unknown - no matching pipeline run for the extra rule   ③`,
+    legend:[
+      { mark:"①", engineer:"What the code says should exist.", auditor:"This is the intended, reviewed, approved state — your baseline for comparison." },
+      { mark:"②", engineer:"What's actually running.", auditor:"An SSH port open to the entire internet that ISN'T in the reviewed code — this bypassed every control tested in Modules 2-6 entirely, because it never went through them." },
+      { mark:"③", engineer:"No record of how it got there.", auditor:"This is itself a finding — an unattributable change to production infrastructure means the change-control process has a gap wide enough for this to happen invisibly." }
+    ]
+  },
+  lens:[
+    "Run or request a plan/diff comparison between declared IaC and live state for a sample of resources, not just a documentation review.",
+    "Treat any drift finding as two questions: what's the current risk of the drifted state, and how did it happen (root cause).",
+    "Check whether drift-detection tooling exists and runs on a schedule — its absence is itself a finding, independent of any specific drift found.",
+    "When remediation is claimed, verify the underlying cause was addressed, not just that the one instance was reverted."
+  ],
+  artifacts:{
+    goodLabel:"No Drift, Monitored", badLabel:"Undetected Drift",
+    goodFile:"drift-clean.txt", goodLang:"TEXT",
+    goodCode:`Resource: aws_s3_bucket.customer_data
+Declared vs Actual: Match - 0 differences
+Drift detection: Automated, runs daily, last run 4 hours ago`,
+    goodNote:"Declared and actual state match, and an automated process is actively checking, not just a one-time comparison.",
+    badFile:"drift-undetected.txt", badLang:"TEXT",
+    badCode:`Resource: aws_iam_role.admin_role
+Declared vs Actual: 1 extra policy attached, not in Terraform
+Drift detection: None configured`,
+    badNote:"Drift exists and nothing would have caught it without this manual comparison — no ongoing detection in place."
+  },
+  exercise:{ fileName:"drift-check.txt", lang:"TEXT", code:
+`terraform plan output:
+
+  # aws_s3_bucket_public_access_block.logs will be updated in-place
+  ~ block_public_acls = false -> true`,
+    question:"What does this terraform plan output most directly indicate?",
+    options:["The code was just written and has never been applied","The live environment currently has block_public_acls set to false, while the code declares it should be true — this is drift the plan is proposing to correct","This is a routine, expected output with no audit significance","Terraform is broken and needs to be reinstalled"],
+    correct:1,
+    explain:"A 'will be updated in-place' plan entry means the tool detected the live resource doesn't match the declared code, and is proposing the specific change needed to reconcile them. The '~' with an old->new value pair shows exactly what's drifted — here, a public-access-block setting currently weaker than the code requires." },
+  scenarioKey:"m10_mfaDrift",
+  redFlags:[
+    "No drift-detection process running at all, relying entirely on the assumption that IaC-declared state matches reality.",
+    "Drift findings with no identifiable root cause or source — suggesting change control has a real, exploitable gap.",
+    "Remediation that reverts the specific instance found without addressing how out-of-band changes were possible in the first place."
+  ],
+  docGuidance:{ note:"Document both the drift itself (declared vs. actual, with specifics) and its root cause investigation separately — a fixed instance with an unaddressed root cause isn't a closed finding.",
+    sample:"Finding: aws_security_group.app_sg (live AWS) contains an ingress rule (port 22 from 0.0.0.0/0) not present in the corresponding Terraform declaration. No pipeline run correlates to this change, indicating an out-of-band manual modification. Root cause: console write-access to security groups was not restricted to the deployment pipeline." },
+  deliverables:[
+    ["Declared-vs-actual comparison performed for a sample of resources","Direct plan/diff output where available, manual comparison otherwise."],
+    ["Confirmation of whether automated drift-detection tooling exists and runs on schedule","Its absence documented as a finding if not present."],
+    ["Root cause investigation for any drift found, not just the specific instance","Remediation validated against the root cause, not only the symptom."]
+  ]
+},
+
+/* ---------- 11 ---------- */
+{
+  id:11, num:"11", title:"Traceability & Control Validation",
+  objectives:[
+    "Build a complete Control → Code → Pipeline → Log traceability chain for a specific control.",
+    "Identify where a traceability chain breaks and document the gap precisely.",
+    "Distinguish 'the control appears to work' from 'the control's effectiveness is proven end-to-end.'"
+  ],
+  scenario:{ tab:"Real-world audit scenario", body:"You need to prove, for one specific production change, that the code was reviewed, the pipeline enforced that review before deploying, and the deployment log shows exactly that reviewed commit went live — with nothing in between. Can you actually follow that thread all the way through?" },
+  concepts:`
+    <p>Every prior module taught one link of the same chain: Module 4 gave you the <strong>Code</strong> link (PR review), Modules 3 and 6 gave you the <strong>Pipeline</strong> link (gates and policy enforcement), and Module 7 gave you the <strong>Log</strong> link (execution proof). Traceability connects them: a shared identifier — most often a commit SHA or a pipeline run ID — that lets you follow one specific change through every stage without a gap or an assumption.</p>
+    <h4>Where chains typically break</h4>
+    <p>Most traceability failures aren't dramatic control failures — they're missing correlation. A deployment log with no commit reference. A pipeline run ID recorded nowhere the log can reference. An approval that doesn't specify which exact commit it covers.</p>
+    <h4>"Appears to work" vs. "proven end-to-end"</h4>
+    <p>A control can look fine at every individual link — a good PR review here, a solid pipeline gate there, a clean log entry somewhere else — and still not be provable as a single, connected chain if you can't tie those observations to the exact same change.</p>`,
+  interpret:{ fileName:"traceability-chain.txt", lang:"TEXT", code:
+`CONTROL:  Production changes require peer review + passing scan   ①
+    v
+CODE:     PR #4821 - commit a1b2c3d - approved by asingh   ②
+    v
+PIPELINE: Run #9042 - triggered by commit a1b2c3d - scan: PASS, gate: PASS   ③
+    v
+LOG:      CloudTrail event 09:15:22 - deploy tagged run_id=9042   ④`,
+    legend:[
+      { mark:"①", engineer:"The control statement, as written in policy.", auditor:"Your starting point — the specific claim you're going to prove or disprove." },
+      { mark:"②", engineer:"The GitHub record.", auditor:"Confirm the commit SHA here (a1b2c3d) is the exact one that ends up deployed — not just 'a' commit from this PR." },
+      { mark:"③", engineer:"The pipeline record.", auditor:"This run is explicitly triggered by that same commit SHA — the link that proves the reviewed code, and only the reviewed code, is what the pipeline processed." },
+      { mark:"④", engineer:"The execution record.", auditor:"The deployment log is tagged with the same run ID — this closes the loop. Without this specific tag, you'd have three separate, unconnected pieces of good-looking evidence." }
+    ]
+  },
+  lens:[
+    "Identify the shared identifier (commit SHA, pipeline run ID) before starting — without one, a chain likely can't be built at all.",
+    "Follow one specific real change fully through all four links rather than checking each link in isolation across different examples.",
+    "Where a link is missing, document precisely which link broke and why — a specific, actionable finding, not a vague 'traceability is weak.'",
+    "Don't let a good-looking individual link substitute for the connection between links — each one has to reference the one before it explicitly."
+  ],
+  artifacts:{
+    goodLabel:"Complete Chain", badLabel:"Broken Chain",
+    goodFile:"chain-complete.txt", goodLang:"TEXT",
+    goodCode:`Control -> PR #4821 (commit a1b2c3d, approved)
+        -> Pipeline run #9042 (triggered by a1b2c3d, gates passed)
+        -> CloudTrail deploy event (tagged run_id=9042)`,
+    goodNote:"Each link explicitly references the one before it via a shared identifier — fully traceable.",
+    badFile:"chain-broken.txt", badLang:"TEXT",
+    badCode:`Control -> PR #4821 (commit a1b2c3d, approved)
+        -> Pipeline run #9042 (no commit reference logged)
+        -> CloudTrail deploy event (no run_id tag)`,
+    badNote:"Three plausible-looking pieces of evidence with no explicit connection between them — the chain can't actually be proven."
+  },
+  exercise:{ fileName:"trace-attempt.txt", lang:"TEXT", code:
+`PR #201 approved 2026-02-01 09:00
+Pipeline run #310 executed 2026-02-01 09:03 (no commit SHA logged)
+Deploy log entry 2026-02-01 09:05 (no run ID referenced)`,
+    question:"What is the correct audit conclusion about this traceability chain?",
+    options:["Fully traceable — the timestamps are close together","Not provably traceable — timing proximity is not the same as an explicit correlating identifier linking each step","This is normal and doesn't need to be documented","The control definitely failed"],
+    correct:1,
+    explain:"Timestamps being close together is suggestive, not proof — without an explicit shared identifier (commit SHA, run ID) connecting each link, you cannot rule out that this pipeline run or deploy corresponds to a different, unrelated change. Document this as an unproven chain, not a passed or failed control." },
+  scenarioKey:"m11_missingCorrelationId",
+  redFlags:[
+    "Reliance on timestamp proximity alone to imply a connection between chain links.",
+    "Pipeline runs or deployment logs with no commit SHA or run ID recorded anywhere they can be cross-referenced.",
+    "Each link evaluated in isolation across different sample examples rather than following one real change through all four links together."
+  ],
+  docGuidance:{ note:"State explicitly which identifier connected each link in a traceability finding, or explicitly which link had no connecting identifier available.",
+    sample:"Finding: Attempted to trace PR #201 through deployment. Pipeline run #310 executed shortly after PR approval but logged no commit SHA; the corresponding deploy log entry logged no pipeline run ID. Chain could not be established via explicit correlating identifiers — control effectiveness for this instance is unproven, not confirmed or failed." },
+  deliverables:[
+    ["At least one fully connected Control→Code→Pipeline→Log trace completed and documented","Explicit shared identifiers cited at each link."],
+    ["List of any broken or unprovable links found, with the specific missing identifier named","Not a general statement that traceability is 'weak.'"],
+    ["Recommendation for correlating-identifier logging where gaps were found","E.g., tagging deploy logs with pipeline run ID."]
+  ]
+},
+
+/* ---------- 12 ---------- */
+{
+  id:12, num:"12", title:"Audit Documentation & Reporting",
+  objectives:[
+    "Write findings that translate technical detail into business-risk language without losing precision.",
+    "Structure workpapers that reference evidence traceably (file, key path, commit, log event).",
+    "Produce a final audit opinion appropriately scoped to what was actually validated."
+  ],
+  scenario:{ tab:"Real-world audit scenario", body:"Your findings are technically airtight — commit SHAs, key paths, exact CloudTrail event IDs — but the audit committee reading your draft report has no idea what any of it means or how urgent it is." },
+  concepts:`
+    <p>A finding has two audiences at once: the person who has to remediate it (needs precision — exact resource, exact commit, exact setting) and the person who has to decide how urgently to fund that remediation (needs business risk, not syntax). Writing for only one audience fails the other.</p>
+    <h4>The two-layer finding</h4>
+    <p>Lead with a <strong>business-risk headline</strong>: what's exposed, what could realistically happen, how urgent. Follow with the <strong>technical detail</strong> in a linked workpaper: exact resource address, exact key path, exact commit or log event — everything needed to locate and fix it without re-deriving your work.</p>
+    <h4>Scoping the final opinion honestly</h4>
+    <p>An audit opinion should say exactly what was tested, over what period, using what evidence tier (Module 9) — and explicitly note anything that couldn't be validated (an unprovable traceability chain from Module 11, evidence that stayed at Weak tier) rather than letting it quietly disappear from a clean-looking conclusion.</p>`,
+  interpret:{ fileName:"finding-draft.txt", lang:"TEXT", code:
+`DRAFT: "S3 bucket ACL misconfigured to public-read; IAM role
+policy contains wildcard resource grant."   ①
+
+REVISED: "A customer-data storage bucket was found configured
+for public access, and a build-service role has account-wide
+permissions with no scope restriction. Together, these create
+a realistic path for customer data exposure. Remediation is
+recommended within 5 business days.
+  -> Full technical detail: Workpaper CTRL-005-WP2"   ②`,
+    legend:[
+      { mark:"①", engineer:"Technically precise and complete.", auditor:"Correct, but unreadable to a non-technical decision-maker — this version can't drive a funding or prioritization decision on its own." },
+      { mark:"②", engineer:"Loses some technical shorthand.", auditor:"This is the finding doing its job — business risk up front, urgency stated explicitly, and technical precision preserved one click away, not discarded." }
+    ]
+  },
+  lens:[
+    "Read every draft finding as if you were the least technical person on the audit committee — if the risk and urgency aren't clear, revise before technical polish.",
+    "Confirm every finding links to a workpaper with exact, re-locatable technical detail (resource address, key path, commit SHA, log event ID).",
+    "State the evidence tier (Module 9) and any traceability limitations (Module 11) explicitly in the opinion — don't let unproven items read as confirmed.",
+    "Scope the opinion to exactly what was tested and over what period — avoid language implying broader coverage than what was actually validated."
+  ],
+  artifacts:{
+    goodLabel:"Two-Layer Finding", badLabel:"Jargon-Only Finding",
+    goodFile:"finding-good.txt", goodLang:"TEXT",
+    goodCode:`HEADLINE: Customer data storage is publicly accessible and an
+overly broad service permission compounds the exposure. High
+urgency - recommend remediation within 5 business days.
+
+DETAIL (Workpaper CTRL-005-WP2): aws_s3_bucket.customer_data
+(s3.tf) - acl = "public-read"; iam-policy.json Statement[0] -
+Action: "*", Resource: "*" attached to ci-deploy-role.`,
+    goodNote:"Business risk and urgency lead; full technical precision is preserved one reference away.",
+    badFile:"finding-bad.txt", badLang:"TEXT",
+    badCode:`"aws_s3_bucket.customer_data has acl=public-read;
+iam-policy.json Statement[0] grants Action:* Resource:*."`,
+    badNote:"Entirely technical — a non-engineer reader cannot determine what's actually at risk or how urgently to act."
+  },
+  exercise:{ fileName:"opinion-draft.txt", lang:"TEXT", code:
+`"Based on our review, all controls are operating effectively."`,
+    question:"What is the biggest problem with issuing this as the final audit opinion, based on this program's methodology?",
+    options:["It's too short","It doesn't specify what was tested, over what period, with what evidence tier, or note any unproven/weak-evidence items — an opinion this unscoped isn't defensible","It should be longer than one sentence regardless of content","There's no problem; concise opinions are best"],
+    correct:1,
+    explain:"An audit opinion has to be scoped to what was actually validated — what controls, what period, what evidence tier, and any limitations (unprovable traceability chains, Weak-tier evidence accepted as corroboration only). A blanket 'all controls are effective' with no scoping misrepresents the actual state of assurance achieved." },
+  scenarioKey:"m12_jargonFinding",
+  redFlags:[
+    "Findings written entirely in technical shorthand with no business-risk translation, or entirely in vague business language with no technical precision.",
+    "A final opinion with no explicit statement of scope, period, or evidence tier behind it.",
+    "Unproven or Weak-tier-evidence items quietly omitted from the opinion rather than disclosed as limitations."
+  ],
+  docGuidance:{ note:"Every finding should be readable in under 30 seconds by a non-technical reader and still contain everything a remediating engineer needs one click away.",
+    sample:"See the 'Two-Layer Finding' example above — it is itself the documentation guidance for the entire program." },
+  deliverables:[
+    ["Every finding reviewed for the two-layer (business + technical) structure","Business headline plus linked technical workpaper detail."],
+    ["Final opinion explicitly scoped: controls tested, period, evidence tiers used","No blanket language implying broader coverage than performed."],
+    ["Limitations section listing any unproven traceability chains or Weak-tier-only evidence","Disclosed, not omitted."]
+  ]
+}
+
+];
+
+/* ============================= CAPSTONE SCENARIO ============================= */
+
+SCENARIOS.capstone_opinion = {
+  prompt: "checkout-service: Terraform declares only an HTTPS ingress rule, but the CloudTrail log shows an IAM user opened SSH to 0.0.0.0/0 directly with no correlating commit or pipeline run. The pipeline's security-scan stage is set to allow_failure: true and isn't in deploy-prod's dependency chain at all. Your stratified sample covered all 12 months. What opinion do you issue?",
+  choices: [
+    { label:"A", text:"Unqualified (clean) opinion — the codebase is well-organized and the team is clearly skilled.",
+      tier:"high", pill:"Elevated Risk",
+      outcome:"Code organization and team skill aren't what an opinion certifies — you have three independent, evidenced findings (an out-of-band network exposure, a non-blocking security scan, and an untraceable change) that directly contradict a clean opinion.",
+      practice:"An opinion follows the evidence gathered during the engagement, not a general impression of the team or codebase quality." },
+    { label:"B", text:"A scoped, qualified opinion: document each finding individually (the drifted security-group rule, the non-enforcing scan stage, the untraceable change) with severity and remediation dates, and conclude that these specific controls are not yet operating effectively.",
+      tier:"low", pill:"Best Practice",
+      outcome:"This is a defensible, evidence-backed opinion — specific, dated, and scoped to exactly what was tested, with a clear path to remediation and re-testing.",
+      practice:"A qualified opinion naming specific, evidenced exceptions is far more useful — and more defensible — than either a blanket pass or a blanket failure." },
+    { label:"C", text:"Adverse opinion — the entire GRC and engineering program should be considered a failure.",
+      tier:"med", pill:"Overcorrection",
+      outcome:"Three specific findings in one service don't establish that every control across the entire program is ineffective — an adverse opinion this broad isn't supported by the scope of evidence actually gathered in this engagement.",
+      practice:"Scope the opinion to what was actually tested. If broader failure is suspected, that's grounds to expand the audit's scope next cycle, not to conclude it without evidence." }
+  ]
+};
+
+/* ============================= CAPSTONE ============================= */
+
+const CAPSTONE = {
+  id:"capstone", title:"Capstone — Audit checkout-service",
+  brief:"You're the code-aware auditor assigned to review checkout-service, a production payments-adjacent repository. You have three artifacts pulled directly from the repo and its cloud environment: the network Terraform, the deployment pipeline YAML, and a CloudTrail log excerpt. Work through the case file, complete the sampling exercise, issue your audit opinion, confirm your deliverables, then take the scored certification exam.",
+  caseFiles:[
+    { fileName:"infra/network.tf", lang:"HCL", code:
+`resource "aws_security_group" "checkout_sg" {
+  name = "checkout-service-sg"
+}
+
+resource "aws_security_group_rule" "https_only" {
+  type              = "ingress"
+  from_port         = 443
+  to_port           = 443
+  protocol          = "tcp"
+  cidr_blocks       = ["10.0.0.0/8"]
+  security_group_id = aws_security_group.checkout_sg.id
+}` },
+    { fileName:".github/workflows/deploy.yml", lang:"YAML", code:
+`stages: [build, test, security-scan, deploy-prod]
+
+security-scan:
+  script: run-sast.sh
+  allow_failure: true
+
+deploy-prod:
+  needs: [test]`
+    },
+    { fileName:"cloudtrail-checkout.json", lang:"JSON", code:
+`{
+  "eventTime": "2026-04-02T14:22:10Z",
+  "eventName": "AuthorizeSecurityGroupIngress",
+  "userIdentity": { "type": "IAMUser", "arn": ".../mrivera" },
+  "sourceIPAddress": "198.51.100.22",
+  "requestParameters": {
+    "groupId": "sg-0a1b2c3d",
+    "ipPermissions": { "fromPort": 22, "toPort": 22, "cidrIp": "0.0.0.0/0" }
+  }
+}` }
+  ],
+  samplingExercise:{ fileName:"population.txt", lang:"TEXT", code:
+`checkout-service deploy-prod population: 2,150 pipeline runs this year.`,
+    question:"Given deploy-prod's dependency chain shown in the pipeline YAML above, what should your sampling approach prioritize?",
+    options:[
+      "A random sample of 25 deploys from the last month only",
+      "A stratified sample across the full year that specifically includes any deploys where the security-scan stage reported a failure — to directly test whether those still reached production despite allow_failure and the missing 'needs' dependency",
+      "No sampling needed — the YAML alone already proves the control is broken",
+      "A sample limited only to deploys personally approved by the repo administrator"
+    ],
+    correct:1,
+    explain:"The YAML already reveals two structural gaps (allow_failure: true, and security-scan missing from deploy-prod's 'needs'). The highest-value sample specifically targets deploys where the scan failed, to directly observe whether those still shipped to production — turning a structural finding into a confirmed, evidenced real-world impact."
+  },
+  deliverables:[
+    ["All three case-file artifacts reviewed and annotated","Terraform, pipeline YAML, and CloudTrail log — findings marked with exact key paths/resource addresses."],
+    ["Sampling worksheet completed for the deploy-prod population","Population size, method, and sample size documented per Module 8."],
+    ["Traceability chain attempted for the flagged security-group change","Document exactly which link (commit, pipeline run) could not be found."],
+    ["Findings drafted in two-layer format for all three issues","Business headline plus linked technical detail, per Module 12."],
+    ["Evidence reliability tier assigned to each case-file artifact","Per Module 9's Strong/Medium/Weak scale."],
+    ["Final audit opinion drafted, explicitly scoped, limitations disclosed","Controls tested, period, evidence tiers, and any unproven items named."]
+  ],
+  exam:{ tag:"Certification Exam", title:"Code-Aware Auditor — Final Certification", storageKey:"capstone", passBand:true, questions:[
+    { q:"What is the correct order of the traceability chain this program is built around?", options:["Log → Pipeline → Code → Control","Control → Code → Pipeline → Log","Code → Control → Log → Pipeline","Pipeline → Control → Code → Log"], correct:1 },
+    { q:"In pipeline configuration, what setting most directly determines whether a failed check blocks deployment?", options:["The stage's name","allow_failure / continue-on-error","The number of lines in the script","The YAML file's filename"], correct:1 },
+    { q:"On a Git/GitHub pull request, what is the core segregation-of-duties test?", options:["The PR has a description field filled in","The approver is a different person than the author, and the approval covers the final commit","The PR was merged quickly after opening","The repository has any branch protection enabled, regardless of rules"], correct:1 },
+    { q:"What does an IAM policy statement with \"Action\": \"*\", \"Resource\": \"*\" grant?", options:["Read-only access to one resource","Full administrative access to everything the policy's principal can reach","Nothing, without a Condition block present","Access limited only to the current session"], correct:1 },
+    { q:"What is configuration drift?", options:["A slow network connection between regions","A mismatch between IaC-declared configuration and the actual live environment","A specific encryption algorithm","A pipeline stage naming convention"], correct:1 },
+    { q:"Rank evidence reliability from strongest to weakest.", options:["Screenshot > export > log","Log > export > screenshot","Export > screenshot > log","All evidence types are equally reliable"], correct:1 },
+    { q:"Why does 'the most recent 25 deployments' make a poor sample for a full-year, system-generated population?", options:["25 is always too small a number","It provides no coverage of the rest of the audit period and would miss issues outside that narrow window","Recent data is inherently inaccurate","Sampling isn't needed in automated environments at all"], correct:1 },
+    { q:"What makes a traceability chain 'proven' rather than merely 'plausible'?", options:["All events happened on the same calendar day","An explicit shared identifier (commit SHA, run ID) connects each link, not just timing proximity","The engineer verbally confirms it's fine","The finding was written down in a workpaper"], correct:1 },
+    { q:"Why should an audit finding include both a business-risk headline and a technical detail section?", options:["To make the report longer and more thorough-looking","So both the deciding audience and the remediating audience can act on the same finding without either being lost","GitHub requires this format","Technical detail should never appear in a finding at all"], correct:1 },
+    { q:"What does a policy-as-code rule using 'warn' instead of 'deny' typically mean for enforcement?", options:["It behaves identically to 'deny'","It flags a violation but does not block the pipeline — a detective, not preventive, control","It only ever applies in test environments","It automatically escalates to the security team for review"], correct:1 }
+  ]}
+};
+
+/* ============================= REFERENCE LIBRARY (3 templates) ============================= */
+
+const REFERENCE = [
+  { id:"ref-workpaper", title:"Audit Workpaper Template",
+    blurb:"The standard structure every control-test workpaper should follow — referenced throughout every module's Audit Documentation Guidance.",
+    render:function(){
+      return `<div class="doc-template"><span class="sec">WORKPAPER: <span class="ph">[Control ID] — [Control Name]</span></span>
+<span class="ph">Prepared by: [name]   Date: [date]   Period: [audit period]</span>
+
+<span class="sec">1. CONTROL DESCRIPTION</span>
+<span class="ph">[As stated in the policy/control library.]</span>
+
+<span class="sec">2. EVIDENCE OBTAINED</span>
+<span class="ph">[Each artifact: file/log/export, source system, and reliability tier — Strong/Medium/Weak.]</span>
+
+<span class="sec">3. SAMPLING METHODOLOGY</span>
+<span class="ph">[Population size, full period covered, selection method, sample size — see the Sampling Worksheet.]</span>
+
+<span class="sec">4. TESTING PERFORMED</span>
+<span class="ph">[Step-by-step: what was traced, compared, or validated, and how.]</span>
+
+<span class="sec">5. RESULTS</span>
+<span class="ph">[Pass/Exception per sample item; every exception detailed individually, not summarized away.]</span>
+
+<span class="sec">6. CONCLUSION</span>
+<span class="ph">[Control effectiveness conclusion, explicitly scoped to what was actually tested.]</span>
+
+<span class="sec">7. CROSS-REFERENCES</span>
+<span class="ph">[Related workpapers, finding IDs, and the correlating identifiers (commit SHA, run ID) used to trace this control.]</span></div>`;
+    }
+  },
+  { id:"ref-evidence-scale", title:"Evidence Reliability Scale",
+    blurb:"The Strong / Medium / Weak hierarchy from Module 9, in full — the reference every evidence-tier judgment in this program points back to.",
+    render:function(){
+      const rows = [
+        { tag:"Strong", cls:"strong", text:"Raw logs (CloudTrail, pipeline execution logs, Git history) and unfiltered system exports pulled directly by the auditor. Independently traceable and resamplable — the auditor could reproduce the pull themselves." },
+        { tag:"Medium", cls:"medium", text:"Curated exports or reports generated by the system but filtered or formatted by a control owner. Reproducible in principle, but not independently pulled by the auditor — verify the generation method before relying on it." },
+        { tag:"Weak", cls:"weak", text:"Screenshots, verbal assurance, informal chat messages, and summary dashboards with no traceable source. Acceptable only as corroboration alongside stronger evidence — never as the primary basis for a conclusion." }
+      ];
+      return rows.map(r=>`<div class="rubric-row"><div class="rubric-tag ${r.cls}">${r.tag}</div><p>${r.text}</p></div>`).join("");
+    }
+  },
+  { id:"ref-sampling-worksheet", title:"Sampling Worksheet Template",
+    blurb:"The fields every sampling decision should document, per Module 8 — population, method, and coverage, not just the resulting sample.",
+    render:function(){
+      const cols = ["Control ID","Population","Pop. Size","Full Period?","Method","Sample Size","Selected By","Coverage Notes"];
+      const rows = [
+        ["CTRL-021","Pipeline runs, deploy-prod","8,412","Yes (Jan–Dec)","Stratified random, 3/month","36","Audit team","All 12 months represented"],
+        ["CTRL-014","Access requests, system-generated","1,204","Yes (Jan–Dec)","Randomized across full year","30","Audit team","No month under 1 sample"]
+      ];
+      return `<div class="table-wrap"><table class="reftable"><thead><tr>${cols.map(c=>`<th>${c}</th>`).join("")}</tr></thead><tbody>
+        ${rows.map(r=>`<tr>${r.map((c,i)=>`<td${i===0?' class="mono"':''}>${c}</td>`).join("")}</tr>`).join("")}
+      </tbody></table></div>`;
+    }
+  }
+];
+
+/* ============================= NAV ORDER (flat, for prev/next) ============================= */
+
+const NAV_ORDER = [
+  ...MODULES.map(m=>({id:m.id, title:m.title})),
+  {id:"capstone", title:CAPSTONE.title},
+  ...REFERENCE.map(r=>({id:r.id, title:r.title}))
+];
+
+/* ============================= STATE ============================= */
+
+let store = {};
+try{ store = JSON.parse(localStorage.getItem("caa_state")||"{}"); }catch(e){ store = {}; }
+const state = {
+  currentId: store.currentId || 1,
+  done: new Set(store.done || []),
+  sim: store.sim || {},
+  quiz: store.quiz || {},
+  tab: store.tab || {},
+  checks: store.checks || {},
+  exam: store.exam || {}
+};
+function persist(){
+  try{ localStorage.setItem("caa_state", JSON.stringify({
+    currentId: state.currentId, done:[...state.done], sim:state.sim, quiz:state.quiz, tab:state.tab, checks:state.checks, exam:state.exam
+  })); }catch(e){}
+}
+
+function esc(s){ return String(s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function escCode(s){ return esc(s).replace(/[①②③④⑤⑥⑦⑧⑨⑩]/g, m=>`<span class="mk">${m}</span>`); }
+function findItem(id){
+  return MODULES.find(m=>String(m.id)===String(id))
+    || (String(id)==="capstone" ? CAPSTONE : null)
+    || REFERENCE.find(r=>r.id===id);
+}
+
+/* ============================= SIDEBAR ============================= */
+
+function renderSide(){
+  const total = MODULES.length;
+  const doneCount = [...state.done].filter(id => MODULES.some(m=>String(m.id)===String(id))).length;
+
+  function navItem(item, num){
+    const active = String(item.id)===String(state.currentId);
+    const isDone = state.done.has(String(item.id));
+    return `<li class="navitem">
+      <button class="navbtn ${active?"active":""} ${isDone?"done":""}" data-goto="${item.id}">
+        ${num?`<span class="num">${num}</span>`:`<span class="dot"></span>`}
+        <span class="label">${esc(item.title)}</span>
+      </button>
+    </li>`;
+  }
+
+  document.getElementById("side").innerHTML = `
+    <div class="brand"><span class="mark">CAA</span><span class="name">Code-Aware Auditor</span></div>
+    <div class="progress-wrap">
+      <div class="progress-label"><span>CORE MODULES</span><span>${doneCount} / ${total}</span></div>
+      <div class="progress-track"><div class="progress-fill" style="width:${total?Math.round(doneCount/total*100):0}%"></div></div>
+    </div>
+    <div class="navgroup">
+      <p class="navgroup-title">Core Modules</p>
+      <ul class="navlist">${MODULES.map(m=>navItem(m, m.num)).join("")}</ul>
+    </div>
+    <div class="navgroup">
+      <p class="navgroup-title">Capstone</p>
+      <ul class="navlist">${navItem(CAPSTONE, null)}</ul>
+    </div>
+    <div class="navgroup">
+      <p class="navgroup-title">Reference Library</p>
+      <ul class="navlist">${REFERENCE.map(r=>navItem(r, null)).join("")}</ul>
+    </div>`;
+
+  document.getElementById("side").querySelectorAll("[data-goto]").forEach(b=>{
+    b.addEventListener("click", ()=>goTo(b.getAttribute("data-goto")));
+  });
+}
+
+function goTo(id){
+  state.currentId = id;
+  persist();
+  renderSide();
+  renderMain();
+  window.scrollTo({top:0, behavior:"instant"});
+}
+
+/* ============================= SHARED COMPONENTS ============================= */
+
+function renderCodebox(fileName, lang, code){
+  return `<div class="codebox"><div class="cb-head"><span class="cb-file">${esc(fileName)}</span><span class="cb-lang">${esc(lang)}</span></div><pre><code>${escCode(code)}</code></pre></div>`;
+}
+
+function renderLegend(legend){
+  return `<div class="table-wrap"><table class="legend-table"><thead><tr><th></th><th>What an engineer sees</th><th>What an auditor should ask</th></tr></thead><tbody>
+    ${legend.map(l=>`<tr><td class="mk-cell">${l.mark}</td><td class="eng">${esc(l.engineer)}</td><td class="aud">${esc(l.auditor)}</td></tr>`).join("")}
+  </tbody></table></div>`;
+}
+
+function renderLens(items){
+  return `<div class="lens-box"><ul>${items.map(i=>`<li>${esc(i)}</li>`).join("")}</ul></div>`;
+}
+function renderRedFlags(items){
+  return `<div class="pitfalls-box"><ul>${items.map(i=>`<li>${esc(i)}</li>`).join("")}</ul></div>`;
+}
+
+function renderArtifactToggle(key, a){
+  const cur = state.tab[key] || "good";
+  const showGood = cur==="good";
+  return `<div class="tabs-row">
+    <button class="tabbtn ${showGood?"on good":""}" data-tab="${key}|good">${esc(a.goodLabel)}</button>
+    <button class="tabbtn ${!showGood?"on bad":""}" data-tab="${key}|bad">${esc(a.badLabel)}</button>
+  </div>
+  ${renderCodebox(showGood?a.goodFile:a.badFile, showGood?a.goodLang:a.badLang, showGood?a.goodCode:a.badCode)}
+  <div class="artifact-note ${showGood?"good":"bad"}">${esc(showGood?a.goodNote:a.badNote)}</div>`;
+}
+function bindArtifactToggle(){
+  document.querySelectorAll("[data-tab]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const [key, val] = btn.getAttribute("data-tab").split("|");
+      state.tab[key] = val;
+      persist();
+      renderMain();
+    });
+  });
+}
+
+function renderExerciseBlock(key, e){
+  const picked = state.quiz[key];
+  let html = renderCodebox(e.fileName, e.lang, e.code);
+  html += `<div class="qz" style="margin-top:16px;border-bottom:none;padding-bottom:0;"><p class="q">${esc(e.question)}</p>`;
+  e.options.forEach((opt,oi)=>{
+    let cls = "choice";
+    if(picked!=null){ if(oi===e.correct) cls += " correct"; else if(oi===picked) cls += " wrong"; }
+    html += `<button class="${cls}" ${picked!=null?"disabled":""} data-ex-pick="${key}|${oi}"><span class="lbl">${String.fromCharCode(65+oi)}</span>${esc(opt)}</button>`;
+  });
+  if(picked!=null){
+    const ok = picked===e.correct;
+    html += `<div class="outcome ${ok?"tier-low":"tier-high"}"><div class="head"><span class="pill ${ok?"low":"high"}">${ok?"Correct":"Not quite"}</span></div><p>${esc(e.explain)}</p></div>`;
+  }
+  html += `</div>`;
+  return html;
+}
+function bindExercise(){
+  document.querySelectorAll("[data-ex-pick]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const [key, oi] = btn.getAttribute("data-ex-pick").split("|");
+      state.quiz[key] = Number(oi);
+      persist();
+      renderMain();
+    });
+  });
+}
+
+function renderScenario(scenKey, instanceKey){
+  const s = SCENARIOS[scenKey];
+  const pickIdx = state.sim[instanceKey];
+  let html = `<div class="interactive"><div class="interactive-head"><span class="tag">What Would You Do</span><span class="title">Audit Judgment Call</span></div><div class="interactive-body">`;
+  html += `<p class="scenario-prompt">${s.prompt}</p>`;
+  s.choices.forEach((c,ci)=>{
+    let cls = "choice";
+    if(pickIdx!=null){
+      if(ci===pickIdx) cls += c.tier==="low" ? " correct" : (c.tier==="high" ? " wrong" : " picked-neutral");
+    }
+    html += `<button class="${cls}" ${pickIdx!=null?"disabled":""} data-scen-pick="${instanceKey}|${scenKey}|${ci}"><span class="lbl">${c.label}</span>${esc(c.text)}</button>`;
+  });
+  if(pickIdx!=null){
+    const c = s.choices[pickIdx];
+    const tierClass = c.tier==="low"?"tier-low":(c.tier==="med"?"tier-med":"tier-high");
+    const pillClass = c.tier==="low"?"low":(c.tier==="med"?"med":"high");
+    html += `<div class="outcome ${tierClass}">
+      <div class="head"><span class="pill ${pillClass}">${esc(c.pill)}</span></div>
+      <p>${esc(c.outcome)}</p>
+      <div class="practice"><b>Best practice —</b> ${esc(c.practice)}</div>
+    </div>
+    <button class="ghost-btn" data-scen-retry="${instanceKey}">Try a different choice</button>`;
+  }
+  html += `</div></div>`;
+  return html;
+}
+function bindScenario(){
+  document.querySelectorAll("[data-scen-pick]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const [instanceKey, scenKey, ci] = btn.getAttribute("data-scen-pick").split("|");
+      state.sim[instanceKey] = Number(ci);
+      persist();
+      renderMain();
+    });
+  });
+  document.querySelectorAll("[data-scen-retry]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      delete state.sim[btn.getAttribute("data-scen-retry")];
+      persist();
+      renderMain();
+    });
+  });
+}
+
+function renderChecklistGeneric(key, items){
+  return `<ul class="checklist">
+    ${items.map((it,i)=>`<li><input type="checkbox" id="chk-${key}-${i}" data-chk="${key}|${i}" ${state.checks[key+"|"+i]?"checked":""}/><label for="chk-${key}-${i}" class="txt">${esc(it[0])}<small>${esc(it[1])}</small></label></li>`).join("")}
+  </ul>`;
+}
+function bindChecklistGeneric(){
+  document.querySelectorAll("[data-chk]").forEach(cb=>{
+    cb.addEventListener("change", ()=>{
+      state.checks[cb.getAttribute("data-chk")] = cb.checked;
+      persist();
+    });
+  });
+}
+
+function renderExamQuiz(block){
+  const ex = state.exam[block.storageKey] || {answers:{}, submitted:false};
+  const qs = block.questions;
+  let html = `<div class="interactive"><div class="interactive-head"><span class="tag">${esc(block.tag)}</span><span class="title">${esc(block.title)}</span></div><div class="interactive-body">`;
+
+  if(!ex.submitted){
+    qs.forEach((q,qi)=>{
+      const picked = ex.answers[qi];
+      html += `<div class="qz"><p class="qmeta">Question ${qi+1} of ${qs.length}</p><p class="q">${esc(q.q)}</p>`;
+      q.options.forEach((opt,oi)=>{
+        const sel = picked===oi;
+        html += `<button class="choice ${sel?"picked-neutral":""}" data-exam-pick="${block.storageKey}|${qi}|${oi}"><span class="lbl">${String.fromCharCode(65+oi)}</span>${esc(opt)}</button>`;
+      });
+      html += `</div>`;
+    });
+    const allAnswered = qs.every((q,qi)=>ex.answers[qi]!=null);
+    html += `<button class="primary-btn" data-exam-submit="${block.storageKey}" ${allAnswered?"":"disabled"}>${allAnswered?"Submit assessment":`Answer all ${qs.length} questions to submit`}</button>`;
+  } else {
+    let correctCount = 0;
+    qs.forEach((q,qi)=>{ if(ex.answers[qi]===q.correct) correctCount++; });
+    const pct = Math.round(correctCount/qs.length*100);
+    let bandClass, bandLabel, note;
+    if(pct < 60){ bandClass="readiness-low"; bandLabel="Low Understanding"; note="Revisit the modules tied to the questions you missed before relying on this material operationally."; }
+    else if(pct < 85){ bandClass="readiness-mid"; bandLabel="Intermediate"; note="Solid grasp of the fundamentals — review the missed items below to close specific gaps."; }
+    else { bandClass="readiness-high"; bandLabel="Advanced Readiness"; note="Strong command of the program end-to-end."; }
+    const r = 52, circ = 2*Math.PI*r;
+    const dash = circ*(pct/100);
+
+    html += `<div class="score-panel">
+      <div class="score-ring"><svg width="120" height="120" viewBox="0 0 120 120">
+        <circle cx="60" cy="60" r="${r}" fill="none" stroke="var(--paper-2)" stroke-width="10"/>
+        <circle cx="60" cy="60" r="${r}" fill="none" stroke="var(--accent)" stroke-width="10" stroke-linecap="round"
+          stroke-dasharray="${dash} ${circ}"/>
+      </svg><div class="num"><span class="n">${pct}%</span><span class="d">${correctCount}/${qs.length}</span></div></div>
+      <div class="band ${bandClass}">${bandLabel}</div>
+      <p class="score-note">${note}</p>
+      ${block.passBand ? `<p class="score-note" style="margin-top:10px;"><strong>${pct>=80?"Passing":"Not yet passing"}</strong> — certification threshold is 80%.</p>` : ""}
+    </div>`;
+
+    qs.forEach((q,qi)=>{
+      const picked = ex.answers[qi];
+      const ok = picked===q.correct;
+      html += `<div class="qz"><p class="qmeta">Question ${qi+1} of ${qs.length}</p><p class="q">${esc(q.q)}</p>`;
+      q.options.forEach((opt,oi)=>{
+        let cls = "choice";
+        if(oi===q.correct) cls += " correct"; else if(oi===picked) cls += " wrong";
+        html += `<button class="${cls}" disabled><span class="lbl">${String.fromCharCode(65+oi)}</span>${esc(opt)}</button>`;
+      });
+      html += `<div class="outcome ${ok?"tier-low":"tier-high"}"><div class="head"><span class="pill ${ok?"low":"high"}">${ok?"Correct":"Missed"}</span></div></div></div>`;
+    });
+    html += `<button class="retry-btn" data-exam-retry="${block.storageKey}">Retake assessment</button>`;
+  }
+  html += `</div></div>`;
+  return html;
+}
+function bindExamQuiz(){
+  document.querySelectorAll("[data-exam-pick]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const [key, qi, oi] = btn.getAttribute("data-exam-pick").split("|");
+      if(!state.exam[key]) state.exam[key] = {answers:{}, submitted:false};
+      state.exam[key].answers[qi] = Number(oi);
+      persist();
+      renderMain();
+    });
+  });
+  document.querySelectorAll("[data-exam-submit]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      state.exam[btn.getAttribute("data-exam-submit")].submitted = true;
+      persist();
+      renderMain();
+    });
+  });
+  document.querySelectorAll("[data-exam-retry]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      state.exam[btn.getAttribute("data-exam-retry")] = {answers:{}, submitted:false};
+      persist();
+      renderMain();
+    });
+  });
+}
+
+/* ============================= CORE MODULE TEMPLATE ============================= */
+
+function renderModule(m){
+  let html = "";
+  html += `<div class="objective"><span class="k">Learning Objectives</span><ul>${m.objectives.map(o=>`<li>${esc(o)}</li>`).join("")}</ul></div>`;
+
+  html += `<div class="section-label">Real-World Audit Scenario</div>`;
+  html += `<div class="case"><span class="case-tab">${esc(m.scenario.tab)}</span><p>${esc(m.scenario.body)}</p></div>`;
+
+  html += `<div class="section-label">Core Concepts</div>`;
+  html += `<div class="prose">${m.concepts}</div>`;
+
+  html += `<div class="section-label">How to Read &amp; Interpret</div>`;
+  html += renderCodebox(m.interpret.fileName, m.interpret.lang, m.interpret.code);
+  html += renderLegend(m.interpret.legend);
+
+  html += `<div class="section-label">Auditor Validation Lens</div>`;
+  html += renderLens(m.lens);
+
+  html += `<div class="section-label">Sample Artifacts</div>`;
+  html += renderArtifactToggle("m"+m.id, m.artifacts);
+
+  html += `<div class="section-label">Hands-On Exercise</div>`;
+  html += renderExerciseBlock("ex-"+m.id, m.exercise);
+
+  html += renderScenario(m.scenarioKey, "m"+m.id+"-"+m.scenarioKey);
+
+  html += `<div class="section-label">Red Flags &amp; False Assurance Risks</div>`;
+  html += renderRedFlags(m.redFlags);
+
+  html += `<div class="section-label">Audit Documentation Guidance</div>`;
+  html += `<div class="docguide-box"><p class="lbl">Guidance</p><p>${esc(m.docGuidance.note)}</p><div class="sample">${esc(m.docGuidance.sample)}</div></div>`;
+
+  html += `<div class="section-label">Deliverables Checklist</div>`;
+  html += `<div class="interactive"><div class="interactive-body">${renderChecklistGeneric("m"+m.id, m.deliverables)}</div></div>`;
+
+  return html;
+}
+function bindModule(){
+  bindArtifactToggle();
+  bindExercise();
+  bindScenario();
+  bindChecklistGeneric();
+}
+
+/* ============================= CAPSTONE / REFERENCE TEMPLATES ============================= */
+
+function renderCapstonePage(){
+  let html = `<div class="case"><span class="case-tab">Capstone brief</span><p>${esc(CAPSTONE.brief)}</p></div>`;
+
+  html += `<div class="section-label">Case File — checkout-service</div>`;
+  CAPSTONE.caseFiles.forEach(cf=>{ html += renderCodebox(cf.fileName, cf.lang, cf.code); });
+
+  html += `<div class="section-label">Sampling Exercise</div>`;
+  html += renderExerciseBlock("capstone-sampling", CAPSTONE.samplingExercise);
+
+  html += `<div class="section-label">Draft Your Audit Opinion</div>`;
+  html += renderScenario("capstone_opinion", "capstone-opinion");
+
+  html += `<div class="section-label">Deliverables Completeness Check</div>`;
+  html += `<div class="interactive"><div class="interactive-body">${renderChecklistGeneric("capstone", CAPSTONE.deliverables)}</div></div>`;
+
+  html += `<div class="section-label">Certification Assessment</div>`;
+  html += renderExamQuiz(CAPSTONE.exam);
+
+  return html;
+}
+function bindCapstonePage(){ bindExercise(); bindScenario(); bindChecklistGeneric(); bindExamQuiz(); }
+
+function renderReferencePage(item){
+  let html = `<p class="prose" style="margin-bottom:22px;">${esc(item.blurb)}</p>`;
+  html += `<div class="interactive"><div class="interactive-head"><span class="tag">Reference</span><span class="title">${esc(item.title)}</span></div><div class="interactive-body">${item.render()}</div></div>`;
+  return html;
+}
+
+/* ============================= MAIN RENDER ============================= */
+
+function itemGroup(item){
+  if(MODULES.some(m=>String(m.id)===String(item.id))) return "core";
+  if(String(item.id)==="capstone") return "capstone";
+  return "reference";
+}
+
+function markDoneIfEligible(id, group){
+  if(group==="core"){ state.done.add(String(id)); persist(); }
+}
+
+function renderMain(){
+  const id = state.currentId;
+  const item = findItem(id);
+  if(!item) return;
+  const group = itemGroup(item);
+  markDoneIfEligible(id, group);
+
+  const groupLabels = { core:"Core Modules", capstone:"Capstone", reference:"Reference Library" };
+  document.getElementById("topline-left").textContent = groupLabels[group].toUpperCase();
+  document.getElementById("topline-right").textContent =
+    group==="core" ? `MODULE ${item.num} / ${MODULES.length}` : groupLabels[group].toUpperCase();
+
+  let html = "";
+  if(group==="core") html += `<p class="eyebrow">Module ${item.num}</p>`;
+  html += `<h1 class="module-title">${esc(item.title)}</h1>`;
+
+  if(group==="core"){ html += renderModule(item); }
+  else if(group==="capstone"){ html += renderCapstonePage(); }
+  else if(group==="reference"){ html += renderReferencePage(item); }
+
+  const idx = NAV_ORDER.findIndex(x=>String(x.id)===String(id));
+  const prev = NAV_ORDER[idx-1], next = NAV_ORDER[idx+1];
+  html += `<div class="footer-nav">
+    ${prev ? `<button class="navbtn2" data-goto2="${prev.id}"><span class="arrow">←</span><span class="t">${esc(prev.title)}</span></button>` : `<span></span>`}
+    ${next ? `<button class="navbtn2" data-goto2="${next.id}"><span class="t">${esc(next.title)}</span><span class="arrow">→</span></button>` : `<span></span>`}
+  </div>`;
+
+  document.getElementById("content").innerHTML = html;
+  document.querySelectorAll("[data-goto2]").forEach(b=>b.addEventListener("click", ()=>goTo(b.getAttribute("data-goto2"))));
+
+  if(group==="core") bindModule();
+  else if(group==="capstone") bindCapstonePage();
+
+  renderSide();
+}
+
+renderSide();
+renderMain();
+
+})();
+</script>
