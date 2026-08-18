@@ -7,7 +7,7 @@ Most IT audit training still assumes a slow-moving environment where a quarterly
 
 This is a single self-contained HTML file — no build step, no server, no dependencies. Open it in a browser and it runs.
 
-**[Live demo](#)** — *enable GitHub Pages (see below) and drop the link here once it's live.*
+**[Live demo](https://stano2.github.io/code-aware-auditor/)**
 
 ## What's inside
 
